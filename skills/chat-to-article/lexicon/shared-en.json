@@ -1,0 +1,16 @@
+{
+  "id": "shared-en",
+  "scope": "shared",
+  "phrases": [
+    {"id": "en-delve", "phrase": "delve", "severity": "ban"},
+    {"id": "en-tapestry", "phrase": "tapestry", "severity": "ban"},
+    {"id": "en-worth", "phrase": "it's worth noting", "severity": "ban"},
+    {"id": "en-dive", "phrase": "let's dive in", "severity": "ban"},
+    {"id": "en-rapidly", "phrase": "in today's rapidly", "severity": "ban"},
+    {"id": "en-leverage", "phrase": "leverage", "severity": "watch"},
+    {"id": "en-robust", "phrase": "robust", "severity": "watch"},
+    {"id": "en-seamless", "phrase": "seamless", "severity": "watch"},
+    {"id": "en-landscape", "phrase": "landscape", "severity": "watch"}
+  ],
+  "patterns": []
+}

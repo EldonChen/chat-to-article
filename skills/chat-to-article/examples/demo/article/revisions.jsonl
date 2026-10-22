@@ -1,0 +1,2 @@
+{"blockId": "b001", "instruction": "接受这块", "before": "我改文章时经常只想换掉一句，拿回来的却是整篇都被改过。所以正文按块保存。修改时只提交这一块，前一块和后一块只供阅读，用来接上语气。没有点名的块留在原来的文件里，", "afterStatus": "accepted"}
+{"blockId": "b002", "instruction": "接受这块", "before": "流程、时序和结构关系写成 Mermaid，源文件和文章放在同一目录，别人打开就能看到图。需要亲手拖动的图，在 draw.io 里改完，再导出 SVG。源文件和 ", "afterStatus": "accepted"}

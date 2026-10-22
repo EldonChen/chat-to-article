@@ -1,0 +1,20 @@
+{
+  "id": "shared-zh",
+  "scope": "shared",
+  "phrases": [
+    {"id": "zh-zhuyi", "phrase": "值得注意的是", "severity": "ban"},
+    {"id": "zh-zongshang", "phrase": "综上所述", "severity": "ban"},
+    {"id": "zh-zongeryan", "phrase": "总而言之", "severity": "ban"},
+    {"id": "zh-bunan", "phrase": "不难发现", "severity": "ban"},
+    {"id": "zh-dangjin", "phrase": "在当今", "severity": "ban"},
+    {"id": "zh-rangwomen", "phrase": "让我们一起", "severity": "ban"},
+    {"id": "zh-benwen", "phrase": "本文将深入", "severity": "ban"},
+    {"id": "zh-xiwang", "phrase": "希望本文对你", "severity": "ban"},
+    {"id": "zh-zuowei", "phrase": "作为一个 AI", "severity": "ban"},
+    {"id": "zh-funeng", "phrase": "赋能", "severity": "watch"},
+    {"id": "zh-zhuashou", "phrase": "抓手", "severity": "watch"},
+    {"id": "zh-bihuan", "phrase": "闭环", "severity": "watch"},
+    {"id": "zh-diceng", "phrase": "底层逻辑", "severity": "watch"}
+  ],
+  "patterns": []
+}

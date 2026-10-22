@@ -1,0 +1,15 @@
+{
+  "figures": [
+    {
+      "id": "fig-flow",
+      "kind": "mermaid",
+      "status": "accepted",
+      "caption": "修订从主张走到分享包，中间经过大纲和正文块。",
+      "alt": "从主张到分享包的四步",
+      "source": "figures/fig-flow.mmd",
+      "prompt": "",
+      "license": "",
+      "blockIds": ["b002"]
+    }
+  ]
+}

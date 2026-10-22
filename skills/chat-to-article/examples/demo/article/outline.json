@@ -1,0 +1,18 @@
+{
+  "sections": [
+    {
+      "id": "s1",
+      "title": "为什么按块改",
+      "claimIds": ["c1"],
+      "figureIds": [],
+      "blockIds": ["b001"]
+    },
+    {
+      "id": "s2",
+      "title": "图放在哪",
+      "claimIds": ["c2"],
+      "figureIds": ["fig-flow"],
+      "blockIds": ["b002"]
+    }
+  ]
+}

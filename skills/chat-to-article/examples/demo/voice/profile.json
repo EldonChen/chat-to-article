@@ -1,0 +1,39 @@
+{
+  "revision": 1,
+  "locale": "zh-CN",
+  "audience": "以后的自己和同事",
+  "person": "第一人称",
+  "paragraph": {
+    "minChars": 80,
+    "maxChars": 280
+  },
+  "structure": {
+    "headingDepth": 2,
+    "listPolicy": "能写成句子就写成句子"
+  },
+  "terms": [
+    {
+      "prefer": "聊天记录",
+      "avoid": "对话语料"
+    }
+  ],
+  "exemplarRefs": [
+    "exemplars/e1.md"
+  ],
+  "rules": [
+    {
+      "id": "r1",
+      "text": "段首先写具体问题，不写总括句",
+      "strength": "enforce",
+      "evidenceArticles": 2,
+      "status": "active"
+    },
+    {
+      "id": "r-hidden",
+      "text": "CANDIDATE_RULE_HIDDEN",
+      "strength": "prefer",
+      "evidenceArticles": 1,
+      "status": "candidate"
+    }
+  ]
+}

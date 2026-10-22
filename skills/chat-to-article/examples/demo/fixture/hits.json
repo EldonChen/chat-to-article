@@ -1,0 +1,17 @@
+[
+  {
+    "id": "conv-full",
+    "title": "按块改文章",
+    "transcript": "transcript.jsonl"
+  },
+  {
+    "id": "conv-summary",
+    "title": "只剩标题的一次聊天",
+    "transcript": null
+  },
+  {
+    "id": "conv-side",
+    "title": "没有勾选的会话",
+    "transcript": "side.jsonl"
+  }
+]

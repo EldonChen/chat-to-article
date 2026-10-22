@@ -1,0 +1,3 @@
+{"id": "c1", "text": "改一块时不把整篇文章放进修改上下文。", "status": "accepted", "sources": [{"kind": "conversation", "id": "conv-full", "note": "用户说明自己只想改一句"}]}
+{"id": "c2", "text": "流程和结构图用 Mermaid 源文件保存，亲手排的图要导出 SVG。", "status": "accepted", "sources": [{"kind": "conversation", "id": "conv-full", "note": "用户希望图以后还能改"}]}
+{"id": "c-secret", "text": "材料里出现过密钥，正文不录原文。", "status": "rejected", "secret": true, "resolved": true, "sources": [{"kind": "conversation", "id": "conv-full", "note": "用户要求不要写入文章"}]}

@@ -1,0 +1,4 @@
+{"role": "user", "message": {"content": [{"type": "text", "text": "我改文章时最烦的是，只想换一句，整篇都被重写。"}]}}
+{"role": "assistant", "message": {"content": [{"type": "text", "text": "正文按块放。改一块时不要把整篇放进上下文，前后块只读。"}, {"type": "tool_use", "name": "search", "input": {"query": "TOOL_ONLY_MARKER"}}]}}
+{"role": "user", "message": {"content": [{"type": "text", "text": "结构图我想以后还能改。另外这串 sk-demo-secret-key-1234567890 不要写进文章。"}]}}
+{"role": "assistant", "message": {"content": [{"type": "text", "text": "流程和结构用 Mermaid 源文件。要亲手排的图用 draw.io，导出 SVG 到 figures。密钥标出来，不写进可分享的正文。"}]}}

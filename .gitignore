@@ -1,0 +1,7 @@
+.DS_Store
+__pycache__/
+*.pyc
+
+# 若在本仓库里试跑，用户声音与文章工作区不入库
+.voice/
+articles/

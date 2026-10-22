@@ -1,0 +1,31 @@
+{
+  "id": "patterns",
+  "scope": "shared",
+  "phrases": [],
+  "patterns": [
+    {
+      "id": "pat-bushi",
+      "name": "不是A而是B",
+      "regex": "不是[^。！？\\n]{1,40}而是",
+      "severity": "watch"
+    },
+    {
+      "id": "pat-bujin",
+      "name": "不仅A更B",
+      "regex": "不仅[^。！？\\n]{1,40}更",
+      "severity": "watch"
+    },
+    {
+      "id": "pat-not-but",
+      "name": "Not X, but Y",
+      "regex": "\\bnot\\b[^\\n.]{1,40}\\bbut\\b",
+      "severity": "watch"
+    },
+    {
+      "id": "pat-its-not",
+      "name": "It's not X. It's Y.",
+      "regex": "It's not [^\\n.]{1,80}\\. It's ",
+      "severity": "watch"
+    }
+  ]
+}
