@@ -39,7 +39,9 @@ articles/<slug>/（一篇文章，可单独共享）
 
 ```mermaid
 flowchart TD
-  topic[定题] --> search[检索与补充材料]
+  topic[定题] --> plan[写作计划：文体、读者、偏好、行文方案]
+  plan --> gatePlan{用户确认写作计划}
+  gatePlan --> search
   search --> claims[主张账本]
   claims --> gateClaims{用户确认主张}
   gateClaims --> outline[大纲与图位]
@@ -80,6 +82,7 @@ flowchart TD
 ```text
 articles/<slug>/
   meta.json
+  writing-plan.json
   claims.jsonl
   outline.json
   blocks/
@@ -103,11 +106,14 @@ articles/<slug>/
   "topic": "",
   "styleRevision": 1,
   "locale": "zh-CN",
-  "phase": "intake"
+  "phase": "planning",
+  "writingPlanConfirmed": false
 }
 ```
 
-`phase` 取 `intake`、`claims`、`outline`、`drafting`、`review`、`export` 之一。
+`phase` 取 `planning`、`intake`、`claims`、`outline`、`drafting`、`review`、`export` 之一。新文章先处于 `planning`，用户确认 `writing-plan.json` 后进入材料收集。
+
+`writing-plan.json` 保存本篇的文体、读者、目的、偏好轴和行文方案。`meta.writingPlanConfirmed` 是写作计划门；主张确认和起草检查都要求该门已通过。计划字段示例见 [writing-plan.md](../skills/chat-to-article/references/writing-plan.md)。
 
 主张一行一条：
 

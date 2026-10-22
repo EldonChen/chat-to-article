@@ -32,15 +32,15 @@ def ready(root: Path) -> tuple[Path, Path]:
     article = root / "article"
     write_voice(voice, cta_lib.read_json(FIXTURE / "profile.json"))
     cta_lib.new_article(article, "按块修订", "block-revision", "块修订", voice)
-    for name in ("claims.jsonl", "outline.json", "materials.json"):
+    for name in ("writing-plan.json", "claims.jsonl", "outline.json", "materials.json"):
         shutil.copyfile(FIXTURE / name, article / name)
     (article / "figures").mkdir(exist_ok=True)
     shutil.copyfile(FIXTURE / "fig-flow.mmd", article / "figures" / "fig-flow.mmd")
     shutil.copyfile(FIXTURE / "manifest.json", article / "figures" / "manifest.json")
-    code, message = cta_lib.set_gate(article, True, None)
+    code, message = cta_lib.set_gate(article, True, None, None)
     if code != 0:
         raise RuntimeError(message)
-    code, message = cta_lib.set_gate(article, None, True)
+    code, message = cta_lib.set_gate(article, None, True, None)
     if code != 0:
         raise RuntimeError(message)
     (article / "blocks").mkdir(exist_ok=True)

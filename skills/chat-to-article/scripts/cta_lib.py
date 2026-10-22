@@ -325,13 +325,24 @@ def new_article(directory: Path, title: str, slug: str, topic: str, voice: Path)
         "topic": topic,
         "styleRevision": profile["revision"],
         "locale": profile.get("locale") or "zh-CN",
-        "phase": "intake",
+        "phase": "planning",
+        "writingPlanConfirmed": False,
         "claimsConfirmed": False,
         "outlineConfirmed": False,
         "writeAll": False,
         "includeProvenance": False,
     }
     save_meta(directory, meta)
+    if not (directory / "writing-plan.json").exists():
+        write_json(directory / "writing-plan.json", {
+            "status": "draft",
+            "genre": [],
+            "audience": "",
+            "purpose": "",
+            "styleAxes": {},
+            "approach": "",
+            "openQuestions": [],
+        })
     if not (directory / "claims.jsonl").exists():
         write_jsonl(directory / "claims.jsonl", [])
     if not (directory / "outline.json").exists():
@@ -344,10 +355,24 @@ def new_article(directory: Path, title: str, slug: str, topic: str, voice: Path)
     return meta
 
 
-def set_gate(article: Path, claims_confirmed: bool | None, outline_confirmed: bool | None) -> tuple[int, str]:
+def set_gate(article: Path, plan_confirmed: bool | None, claims_confirmed: bool | None, outline_confirmed: bool | None) -> tuple[int, str]:
     meta = load_meta(article)
     claims = load_claims(article)
+    if plan_confirmed:
+        plan_path = article / "writing-plan.json"
+        if not plan_path.exists():
+            return 1, "缺少 writing-plan.json。先记录并确认写作计划。\n"
+        plan = read_json(plan_path)
+        missing = [key for key in ("genre", "audience", "purpose", "approach") if not plan.get(key)]
+        if missing:
+            return 1, "写作计划还缺少：" + "、".join(missing) + "\n"
+        plan["status"] = "confirmed"
+        write_json(plan_path, plan)
+        meta["writingPlanConfirmed"] = True
+        meta["phase"] = "intake"
     if claims_confirmed:
+        if not meta.get("writingPlanConfirmed"):
+            return 1, "先确认 writing-plan.json 中的写作计划，再确认主张。\n"
         if not any(row.get("status") == "accepted" for row in claims):
             return 1, "至少要有一条已接受的主张，才能确认主张。\n"
         open_rows = [row["id"] for row in claims if row.get("status") in ("candidate", "disputed")]
@@ -387,8 +412,8 @@ def allow_write_all(article: Path) -> None:
 
 def check_draft(article: Path, section: str) -> tuple[int, str]:
     meta = load_meta(article)
-    if not meta.get("claimsConfirmed") or not meta.get("outlineConfirmed"):
-        return 1, "主张和大纲都确认之后才能起草。\n"
+    if not meta.get("writingPlanConfirmed") or not meta.get("claimsConfirmed") or not meta.get("outlineConfirmed"):
+        return 1, "写作计划、主张和大纲都确认之后才能起草。\n"
     if section == "first":
         return 0, "可以写第一节。\n"
     if meta.get("writeAll"):
@@ -764,6 +789,8 @@ def render_article(article: Path, anchors: bool, provenance: bool) -> str:
 def export_errors(article: Path, voice: Path) -> list[str]:
     meta = load_meta(article)
     errors = []
+    if not meta.get("writingPlanConfirmed"):
+        errors.append("写作计划还没确认。")
     if not meta.get("claimsConfirmed") or not meta.get("outlineConfirmed"):
         errors.append("主张或大纲还没确认。")
     claims = claim_map(article)

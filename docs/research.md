@@ -145,6 +145,22 @@ AI 味主要是可枚举的套话和句式，不是一种神秘的“温度”�
 - 用生图接口画架构图和数据图。
 - 在第一版建聊天向量库，或依赖 draw.io 自动把图写回仓库。
 
+## 写作前的计划与人机交互
+
+这次补充调研参考了 Purdue OWL 的写作过程指南、Google 和 Microsoft 的技术文档风格指南、Diátaxis 文档分类、Nature Methods 的内容类型规范，以及 Stripe 的工程实践文章。它们面向不同写作场景，但共同提示：应先辨明目的、读者和作品类型，再决定信息结构和语气；结构要服务读者任务，不能把单一模板套给所有文章。Nature 对研究文章、简讯等类型列出不同结构，Diátaxis 区分教程、操作指南、参考和解释，正说明题材相同也可能需要不同写法。Stripe 工程文章则展示了如何从问题与约束出发串联决策和经验。
+
+因此增加文章级 `writing-plan.json` 和写作计划确认门。计划包含文体、目标读者、目的、模糊偏好轴和行文方案。偏好用连续描述而非封闭分类；示例作为锚点，用户可以暂缓决定。Agent 继续文章时要先读取存档状态，报告已完成、待定和下一步选项；仅在回答会改变文章取材、结构或事实边界时提问。问卷设计遵循单题单概念、答案选项平衡、允许自定义或跳过、按回答分支、最后复述为可执行指令。
+
+参考来源：
+
+- [Purdue OWL: The Writing Process](https://owl.purdue.edu/owl/general_writing/the_writing_process/index.html)
+- [Purdue OWL: Purposes](https://owl.purdue.edu/owl/general_writing/academic_writing/rhetorical_situation/purposes.html)
+- [Google developer documentation style guide](https://developers.google.com/style)
+- [Microsoft Writing Style Guide](https://learn.microsoft.com/en-us/style-guide)
+- [Diátaxis](https://www.diataxis.fr/start-here/)
+- [Nature Methods: Content types](https://www.nature.com/nmeth/content)
+- [Stripe: How we built it: Usage-based billing](https://stripe.com/blog/how-we-built-it-usage-based-billing)
+
 ## Demo 落地了什么
 
 `skills/chat-to-article/` 里有 skill 指令、共享词表，以及抽取、扫描、编译、锚点同步和风格钉住的脚本。判断、起草和改写仍由 agent 按这些指令完成，不写进脚本。

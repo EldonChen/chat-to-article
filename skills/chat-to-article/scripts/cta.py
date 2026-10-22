@@ -65,10 +65,10 @@ def cmd_new_article(args) -> int:
 
 
 def cmd_set_gate(args) -> int:
-    if not args.claims and not args.outline:
-        print("指定 --claims 或 --outline。")
+    if not args.plan and not args.claims and not args.outline:
+        print("指定 --plan、--claims 或 --outline。")
         return 1
-    code, message = cta_lib.set_gate(_article(args), args.claims or None, args.outline or None)
+    code, message = cta_lib.set_gate(_article(args), args.plan or None, args.claims or None, args.outline or None)
     sys.stdout.write(message)
     return code
 
@@ -183,6 +183,7 @@ def cmd_demo(_args) -> int:
     print(f"全文已抽出，疑似密钥 {len(secrets)} 处。密钥留在抽取结果里，不进入正文。")
 
     cta_lib.new_article(article, "按块修订", "block-revision", "块修订", voice)
+    shutil.copyfile(fixture / "writing-plan.json", article / "writing-plan.json")
     shutil.copyfile(fixture / "claims.jsonl", article / "claims.jsonl")
     shutil.copyfile(fixture / "outline.json", article / "outline.json")
     shutil.copyfile(fixture / "materials.json", article / "materials.json")
@@ -190,11 +191,11 @@ def cmd_demo(_args) -> int:
     figures.mkdir(exist_ok=True)
     shutil.copyfile(fixture / "fig-flow.mmd", figures / "fig-flow.mmd")
     shutil.copyfile(fixture / "manifest.json", figures / "manifest.json")
-    code, message = cta_lib.set_gate(article, True, None)
+    code, message = cta_lib.set_gate(article, True, None, None)
     sys.stdout.write(message)
     if code != 0:
         return code
-    code, message = cta_lib.set_gate(article, None, True)
+    code, message = cta_lib.set_gate(article, None, True, None)
     sys.stdout.write(message)
     if code != 0:
         return code
@@ -266,6 +267,7 @@ def build_parser() -> argparse.ArgumentParser:
     gate.add_argument("--article", required=True)
     gate.add_argument("--claims", action="store_true")
     gate.add_argument("--outline", action="store_true")
+    gate.add_argument("--plan", action="store_true")
     gate.set_defaults(func=cmd_set_gate)
 
     draft = sub.add_parser("check-draft")

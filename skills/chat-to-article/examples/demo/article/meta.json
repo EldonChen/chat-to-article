@@ -5,6 +5,7 @@
   "styleRevision": 1,
   "locale": "zh-CN",
   "phase": "export",
+  "writingPlanConfirmed": true,
   "claimsConfirmed": true,
   "outlineConfirmed": true,
   "writeAll": false,

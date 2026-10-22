@@ -29,6 +29,7 @@ python3 <skill>/scripts/cta.py <子命令>
 - 禁用词、习惯说法、放行 → [lexicon.md](references/lexicon.md)
 - 图的类型和文件 → [figures.md](references/figures.md)
 - 会话怎么找、怎么抽 → [sources.md](references/sources.md)
+- 开写前如何确定文体、读者、偏好和行文方案，以及如何问用户 → [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)
 
 用户说「整篇重写」时，先停。复述这将重写全部正文块，问「确认整篇重写吗？」。得到肯定后再逐块改。只说「改改」时，先问是改哪一块、改大纲，还是改主张。没有整篇重写的脚本。
 
@@ -39,6 +40,7 @@ python3 <skill>/scripts/cta.py <子命令>
 复制这份清单。前一项没通过，不要做下一项。
 
 ```
+- [ ] 写作计划确认
 - [ ] 材料覆盖
 - [ ] 主张确认
 - [ ] 大纲确认
@@ -48,6 +50,22 @@ python3 <skill>/scripts/cta.py <子命令>
 - [ ] 风格候选
 - [ ] 导出
 ```
+
+### 写作计划
+
+新建文章后，先按 [writing-plan.md](references/writing-plan.md) 确认文章类型、目标读者、写作目的、偏好维度和行文方案。不要把“科技 / 人文 / 小说”当成互斥的风格标签：文体可以组合，也可以用用户自己的描述。偏好维度是可调整的草图，不是人格测验。
+
+先检查用户是否已经在对话里给出这些答案；已明确的内容直接复述为计划，不重复盘问。仍有会改变文章方向的未知项时，按 [discovery-questions.md](references/discovery-questions.md) 一次问一个或少量选择题，给出推荐项、可自定义项和“暂不确定 / 由你建议”。用户选择后写入 `writing-plan.json`，展示简短计划摘要并确认。写作计划未经确认，不抽取主张、不提纲、不起草。
+
+```bash
+python3 <skill>/scripts/cta.py new-article --title "标题" --slug slug --topic "主题"
+# 写入 writing-plan.json 并得到用户确认后：
+python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --plan
+```
+
+把用户确认的方向写入文章目录 `writing-plan.json`。未指定 `--dir` 时，文章在 `./articles/<slug>/`。
+
+每次继续已有文章，先读 `meta.json`、`writing-plan.json`、`claims.jsonl`、`outline.json` 和块状态，告诉用户当前阶段、已完成事项、阻塞项及下一步的可选路径。不要从“上次生成了第一节”推断用户已接受它；以文件状态为准。状态交互模板见 `discovery-questions.md`。
 
 ### 材料覆盖
 
@@ -62,11 +80,10 @@ python3 <skill>/scripts/cta.py check-materials --hits hits.json --selected id1,i
 ### 主张和大纲
 
 ```bash
-python3 <skill>/scripts/cta.py new-article --title "标题" --slug slug --topic "主题"
 python3 <skill>/scripts/cta.py extract --jsonl 会话.jsonl --out 抽取.md --secrets-out secrets.json
 ```
 
-未指定 `--dir` 时，文章在 `./articles/<slug>/`。把勾选结果写入 `materials.json`：`selected` 是勾选的 id，`fullText` 只放有全文的 id。主张写入 `claims.jsonl`，来源 `kind` 用 `conversation`、`file` 或 `paste`。只有摘要的会话不能出现在来源里。疑似密钥记在主张上：`secret: true`，原文不要抄进正文。用户处理后再 `mark-claim --resolved`。
+把勾选结果写入 `materials.json`：`selected` 是勾选的 id，`fullText` 只放有全文的 id。主张写入 `claims.jsonl`，来源 `kind` 用 `conversation`、`file` 或 `paste`。只有摘要的会话不能出现在来源里。疑似密钥记在主张上：`secret: true`，原文不要抄进正文。用户处理后再 `mark-claim --resolved`。
 
 每条主张要用户接受或拒绝。还有 `candidate` 或 `disputed` 时，不要确认：
 

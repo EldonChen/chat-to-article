@@ -1,0 +1,12 @@
+{
+  "status": "confirmed",
+  "genre": ["工程实践文章", "解释性文章"],
+  "audience": "熟悉软件开发、想了解文章协作和修订机制的工程师",
+  "purpose": "解释按块修订的机制和边界",
+  "styleAxes": {
+    "explanationPace": "先给具体问题，再说明做法",
+    "abstraction": "用流程图和实例解释概念"
+  },
+  "approach": "从返工问题出发，说明按块修订和图资产管理，再给出工作流程。",
+  "openQuestions": []
+}

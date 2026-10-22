@@ -6,6 +6,8 @@
 
 本仓库是这个 skill 的项目。demo 已按产品规格和架构落地：skill 指令、共享词表，以及抽取、扫描、编译和修订门禁的脚本。对话里的起草和改写仍由 agent 完成。
 
+写作流程现在先确认文章级写作计划（文体、读者、目的、偏好和行文方案），再进入材料、主张和大纲。提问与问卷设计规则见 `skills/chat-to-article/references/discovery-questions.md`。
+
 ## 名字
 
 | 用途 | 取值 |
