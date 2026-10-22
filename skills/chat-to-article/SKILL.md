@@ -51,7 +51,7 @@ python3 <skill>/scripts/cta.py <子命令>
 
 ### 材料覆盖
 
-按 [sources.md](references/sources.md) 检索并写成 `hits.json`。用户勾选后运行：
+按 [sources.md](references/sources.md) 检索并写成 `hits.json`。用户直接引用并要求使用的聊天视为已选择；用当前环境可用的方式读取消息正文，若支持分页则继续读取，并将已读的 user/assistant 文本保存为 JSONL 全文材料。也可使用用户提供的导出文件或粘贴文本。不要因为没有本地导出文件就把已读到的聊天标成摘要，也不要让用户重复提供已经可读的材料。无法读到正文时才标为摘要，并说明具体限制。用户从检索结果中选择时再按选择登记。然后运行：
 
 ```bash
 python3 <skill>/scripts/cta.py check-materials --hits hits.json --selected id1,id2 --supplement 补充.md
