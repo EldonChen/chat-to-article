@@ -69,7 +69,7 @@ python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --plan
 
 ### 材料覆盖
 
-按 [sources.md](references/sources.md) 检索并写成 `hits.json`。用户直接引用并要求使用的聊天视为已选择；用当前环境可用的方式读取消息正文，若支持分页则继续读取，并将已读的 user/assistant 文本保存为 JSONL 全文材料。也可使用用户提供的导出文件或粘贴文本。不要因为没有本地导出文件就把已读到的聊天标成摘要，也不要让用户重复提供已经可读的材料。无法读到正文时才标为摘要，并说明具体限制。用户从检索结果中选择时再按选择登记。然后运行：
+按 [sources.md](references/sources.md) 检索并写成 `hits.json`。用户直接引用并要求使用的聊天视为已选择；逐页读取，直到读取接口明确报告没有下一页，并检查每条消息是否被截断。只有完成覆盖核对后，才把记录登记为全文。导出文件也要和消息数核对。不要因为没有本地导出文件就把已读正文标成摘要，也不要因为拿到部分正文就标成全文。无法完整读取时说明覆盖范围，允许用户提供导出或补充文本。用户从检索结果中选择时再按选择登记。然后运行：
 
 ```bash
 python3 <skill>/scripts/cta.py check-materials --hits hits.json --selected id1,id2 --supplement 补充.md
@@ -80,7 +80,7 @@ python3 <skill>/scripts/cta.py check-materials --hits hits.json --selected id1,i
 ### 主张和大纲
 
 ```bash
-python3 <skill>/scripts/cta.py extract --jsonl 会话.jsonl --out 抽取.md --secrets-out secrets.json
+python3 <skill>/scripts/cta.py extract --jsonl 会话.jsonl --coverage coverage.json --out 抽取.md --secrets-out secrets.json
 ```
 
 把勾选结果写入 `materials.json`：`selected` 是勾选的 id，`fullText` 只放有全文的 id。主张写入 `claims.jsonl`，来源 `kind` 用 `conversation`、`file` 或 `paste`。只有摘要的会话不能出现在来源里。疑似密钥记在主张上：`secret: true`，原文不要抄进正文。用户处理后再 `mark-claim --resolved`。

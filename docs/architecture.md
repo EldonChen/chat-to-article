@@ -115,6 +115,8 @@ articles/<slug>/
 
 `writing-plan.json` 保存本篇的文体、读者、目的、偏好轴和行文方案。`meta.writingPlanConfirmed` 是写作计划门；主张确认和起草检查都要求该门已通过。计划字段示例见 [writing-plan.md](../skills/chat-to-article/references/writing-plan.md)。
 
+材料命中记录中的全文会话必须同时引用 `transcript` 和 `coverage` 文件。`check-materials` 会在登记全文前核对覆盖清单中的分页终止、捕获轮数、文本消息数和截断标记。只读到最新一页或含被截断消息的会话不能作为全文来源。
+
 主张一行一条：
 
 ```json

@@ -23,6 +23,10 @@ def _article(args) -> Path:
 
 
 def cmd_extract(args) -> int:
+    complete, reason = cta_lib.validate_transcript_coverage(Path(args.jsonl), Path(args.coverage))
+    if not complete:
+        print(f"全文未核验：{reason}", file=sys.stderr)
+        return 2
     document, secrets = cta_lib.extract_jsonl(Path(args.jsonl))
     if args.out:
         Path(args.out).write_text(document, encoding="utf-8")
@@ -30,12 +34,21 @@ def cmd_extract(args) -> int:
         sys.stdout.write(document)
     if args.secrets_out:
         cta_lib.write_json(Path(args.secrets_out), secrets)
-    print(f"疑似密钥 {len(secrets)} 处", file=sys.stderr)
+    print(
+        f"覆盖已核验：{cta_lib.count_text_messages(Path(args.jsonl))} 条文本消息；疑似密钥 {len(secrets)} 处",
+        file=sys.stderr,
+    )
     return 0
 
 
 def cmd_check_materials(args) -> int:
-    hits = cta_lib.read_json(Path(args.hits))
+    hits_path = Path(args.hits).expanduser().resolve()
+    hits = cta_lib.read_json(hits_path)
+    for hit in hits:
+        for key in ("transcript", "coverage"):
+            value = hit.get(key)
+            if value and not Path(value).expanduser().is_absolute():
+                hit[key] = str((hits_path.parent / value).resolve())
     selected = [item for item in args.selected.split(",") if item]
     code, report = cta_lib.check_materials(hits, selected, args.supplement or [])
     sys.stdout.write(report)
@@ -172,6 +185,8 @@ def cmd_demo(_args) -> int:
     for hit in hits:
         if hit.get("transcript"):
             hit["transcript"] = str(fixture / hit["transcript"])
+        if hit.get("coverage"):
+            hit["coverage"] = str(fixture / hit["coverage"])
     code, report = cta_lib.check_materials(hits, ["conv-full", "conv-summary"], [])
     sys.stdout.write(report)
     if code != 0:
@@ -242,6 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     extract = sub.add_parser("extract")
     extract.add_argument("--jsonl", required=True)
+    extract.add_argument("--coverage", required=True, help="已核对分页和截断状态的 coverage.json")
     extract.add_argument("--out")
     extract.add_argument("--secrets-out")
     extract.set_defaults(func=cmd_extract)

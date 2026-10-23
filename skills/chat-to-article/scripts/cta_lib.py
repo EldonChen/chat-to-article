@@ -269,6 +269,57 @@ def extract_jsonl(path: Path) -> tuple[str, list[dict]]:
     return document, find_secrets(document)
 
 
+def count_text_messages(path: Path) -> int:
+    count = 0
+    for row in read_jsonl(path):
+        role = row.get("role")
+        content = (row.get("message") or {}).get("content")
+        has_text = isinstance(content, str) and bool(content.strip())
+        if isinstance(content, list):
+            has_text = any(
+                isinstance(item, dict) and item.get("type") == "text" and item.get("text")
+                for item in content
+            )
+        if role in ("user", "assistant") and has_text:
+            count += 1
+    return count
+
+
+def validate_transcript_coverage(transcript: Path, coverage_path: Path) -> tuple[bool, str]:
+    if not transcript.is_file():
+        return False, "找不到 transcript 文件"
+    if not coverage_path.is_file():
+        return False, "缺少 coverage.json，无法证明读取完整"
+    try:
+        coverage = read_json(coverage_path)
+    except (OSError, json.JSONDecodeError):
+        return False, "coverage.json 无法读取"
+    if coverage.get("complete") is not True:
+        return False, "覆盖清单未标记 complete"
+    if coverage.get("terminalHasMore") is not False:
+        return False, "最后一页仍有未读取内容，或没有记录分页结束状态"
+    if coverage.get("truncatedItems") != 0:
+        return False, "读取结果中有被截短的消息"
+    captured_turns = coverage.get("capturedTurns")
+    source_turns = coverage.get("sourceTurns")
+    if not isinstance(captured_turns, int) or not isinstance(source_turns, int) or captured_turns != source_turns:
+        return False, "覆盖清单中的对话轮数不匹配"
+    captured_messages = coverage.get("capturedMessages")
+    try:
+        actual_messages = count_text_messages(transcript)
+    except (OSError, json.JSONDecodeError):
+        return False, "transcript.jsonl 无法读取或格式无效"
+    if not isinstance(captured_messages, int) or captured_messages != actual_messages:
+        return False, "覆盖清单中的文本消息数与 JSONL 不匹配"
+    if coverage.get("sourceType") == "paged-read-thread":
+        pages_read = coverage.get("pagesRead")
+        if not isinstance(pages_read, int) or pages_read < 1:
+            return False, "没有记录已读取的分页数"
+    elif coverage.get("sourceType") not in ("user-export", "user-paste"):
+        return False, "coverage.json 的 sourceType 无效"
+    return True, "分页结束、对话轮次及文本消息数均已核对"
+
+
 def check_materials(hits: list, selected: list[str], supplements: list[str]) -> tuple[int, str]:
     by_id = {hit["id"]: hit for hit in hits}
     lines = []
@@ -281,8 +332,18 @@ def check_materials(hits: list, selected: list[str], supplements: list[str]) -> 
             lines.append(f"未勾选\t{hit['id']}\t{hit.get('title', '')}")
             continue
         if has_file:
-            usable = True
-            lines.append(f"有全文\t{hit['id']}\t{hit.get('title', '')}")
+            coverage_path = hit.get("coverage")
+            if coverage_path:
+                complete, reason = validate_transcript_coverage(
+                    Path(transcript).expanduser(), Path(coverage_path).expanduser()
+                )
+            else:
+                complete, reason = False, "缺少 coverage.json，无法证明读取完整"
+            if complete:
+                usable = True
+                lines.append(f"有全文\t{hit['id']}\t{hit.get('title', '')}")
+            else:
+                lines.append(f"全文未核验\t{hit['id']}\t{reason}")
         else:
             lines.append(f"只有摘要\t{hit['id']}\t{hit.get('title', '')}")
     for item_id in selected:
