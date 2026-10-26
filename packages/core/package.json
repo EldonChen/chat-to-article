@@ -1,0 +1,21 @@
+{
+  "name": "@liem-opc/chat-to-article-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "聊出文章来的数据模型与确定性读写，只在仓库内被各 web 应用打包引用。",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./block": "./src/block.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,22 @@
+name: Release @liem-opc/chat-to-article-mcp-ui
+
+on:
+  push:
+    tags: ["mcp-ui-v*"]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Run every step but skip the actual npm upload
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/_publish-package.yml
+    with:
+      package-dir: mcp-ui
+      tag-prefix: mcp-ui-v
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}

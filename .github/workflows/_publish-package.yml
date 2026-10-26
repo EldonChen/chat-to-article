@@ -1,0 +1,74 @@
+name: Publish package (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      package-dir:
+        description: Directory under packages/, e.g. admin-ui
+        required: true
+        type: string
+      tag-prefix:
+        description: Git tag prefix that carries the version, e.g. admin-ui-v
+        required: true
+        type: string
+      dry-run:
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check version against tag
+        id: meta
+        working-directory: packages/${{ inputs.package-dir }}
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            expected="${GITHUB_REF_NAME#${{ inputs.tag-prefix }}}"
+            if [[ "$expected" != "$version" ]]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match $name@$version"
+              exit 1
+            fi
+          fi
+          if npm view "$name@$version" version > /dev/null 2>&1; then
+            echo "::error::$name@$version is already on npm; bump the version first"
+            exit 1
+          fi
+
+      - name: Typecheck, test, build
+        run: |
+          pnpm --filter "${{ steps.meta.outputs.name }}..." run typecheck
+          pnpm --filter "${{ steps.meta.outputs.name }}..." run test
+          pnpm --filter "${{ steps.meta.outputs.name }}" run build
+
+      - name: Smoke-test the packed CLI
+        working-directory: packages/${{ inputs.package-dir }}
+        run: |
+          pnpm pack --pack-destination "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y > /dev/null
+          npm install "$RUNNER_TEMP"/*.tgz
+          bin=$(node -p "Object.keys(require('${{ steps.meta.outputs.name }}/package.json').bin)[0]")
+          npx "$bin" --help
+
+      # 不设置 NODE_AUTH_TOKEN。pnpm 只要看到静态令牌就会跳过 OIDC。
+      # Trusted Publishing 在公开仓库上会自动附带 provenance。
+      - name: Publish
+        working-directory: packages/${{ inputs.package-dir }}
+        run: pnpm publish --registry https://registry.npmjs.org --access public --no-git-checks --provenance ${{ inputs.dry-run && '--dry-run' || '' }}

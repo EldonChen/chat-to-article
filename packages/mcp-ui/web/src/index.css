@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* 宿主通过 data-theme 告知明暗主题，并以 --font-sans 等规范变量下发字体。 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-sans: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Source Han Serif SC", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+body {
+  @apply m-0 bg-transparent font-sans antialiased;
+  color: var(--color-text-primary, inherit);
+}
+
+/* 审阅编辑器 ------------------------------------------------------------- */
+
+.review-editor .ProseMirror {
+  @apply min-h-64 font-serif text-[17px] leading-[1.95] text-stone-800 outline-none dark:text-stone-100;
+}
+.review-editor .ProseMirror p {
+  @apply my-4;
+}
+.review-editor .ProseMirror h1,
+.review-editor .ProseMirror h2,
+.review-editor .ProseMirror h3 {
+  @apply mb-3 mt-6 font-sans font-semibold;
+}
+.review-editor .ProseMirror ul {
+  @apply list-disc pl-6;
+}
+.review-editor .ProseMirror ol {
+  @apply list-decimal pl-6;
+}
+.review-editor .ProseMirror blockquote {
+  @apply border-l-4 border-stone-300 pl-4 text-stone-600;
+}
+.review-editor .ProseMirror code {
+  @apply rounded bg-stone-100 px-1 font-mono text-sm dark:bg-stone-800;
+}
+.review-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-stone-400;
+}
+
+.track-ins {
+  @apply rounded-sm bg-emerald-100/70 text-emerald-800 underline decoration-emerald-500 decoration-2 underline-offset-4 dark:bg-emerald-900/40 dark:text-emerald-200;
+}
+.track-del {
+  @apply rounded-sm bg-rose-100/60 text-rose-700 line-through decoration-rose-500 decoration-2 dark:bg-rose-900/40 dark:text-rose-300;
+}
+.hide-markup .track-del {
+  display: none;
+}
+.hide-markup .track-ins {
+  @apply bg-transparent text-inherit no-underline;
+}
+
+.comment-mark {
+  @apply border-b-2 border-amber-400 bg-amber-100/70 dark:bg-amber-900/40;
+}
+
+.lint-ban {
+  text-decoration: underline wavy #e11d48;
+  text-underline-offset: 5px;
+}
+.lint-watch {
+  text-decoration: underline dotted #d97706;
+  text-underline-offset: 5px;
+}

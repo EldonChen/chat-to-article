@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/server", "src/shared", "test", "dev/server.ts", "tsup.config.ts", "vite.config.ts"]
+}

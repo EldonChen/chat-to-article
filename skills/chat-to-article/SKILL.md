@@ -30,6 +30,7 @@ python3 <skill>/scripts/cta.py <子命令>
 - 图的类型和文件 → [figures.md](references/figures.md)
 - 会话怎么找、怎么抽 → [sources.md](references/sources.md)
 - 开写前如何确定文体、读者、偏好和行文方案，以及如何问用户 → [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)
+- 工具清单里有 `review_block`、`review_claims` 等审阅工具 → [review-ui.md](references/review-ui.md)：计划、主张、大纲、块、图和风格候选都在对话里嵌入的界面上审，不在对话里贴 JSON
 
 用户说「整篇重写」时，先停。复述这将重写全部正文块，问「确认整篇重写吗？」。得到肯定后再逐块改。只说「改改」时，先问是改哪一块、改大纲，还是改主张。没有整篇重写的脚本。
 

@@ -5,3 +5,8 @@ __pycache__/
 # 若在本仓库里试跑，用户声音与文章工作区不入库
 .voice/
 articles/
+
+node_modules/
+dist/
+*.tgz
+.vite/

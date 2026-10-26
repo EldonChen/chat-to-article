@@ -58,6 +58,39 @@ skills/chat-to-article/
 
 用户自己的风格和私有词表不进这个仓库，默认放在 `~/.chat-to-article/`。文章工作区由用户指定，默认是当前项目里的 `articles/<slug>/`。
 
+## Web 应用
+
+`packages/` 下有两个独立发布到 npm 的 web 应用，和 skill 解耦：skill 不依赖它们，它们只读写 skill 定义的文件格式。
+
+| 包 | 用途 | 启动 |
+| --- | --- | --- |
+| [`@liem-opc/chat-to-article-admin-ui`](packages/admin-ui) | 只读管理台：风格、词表、当前目录下的所有文章，导出 Markdown | `npx @liem-opc/chat-to-article-admin-ui` |
+| [`@liem-opc/chat-to-article-mcp-ui`](packages/mcp-ui) | MCP App：在 agent 对话里嵌入审阅界面，审计划、主张、大纲、正文块（修订模式 + 批注）、图、风格候选 | MCP 配置里写 `npx -y @liem-opc/chat-to-article-mcp-ui` |
+
+`packages/core` 是两者共用的读取、渲染和词表检查代码（与 `cta_lib.py` 输出一致，有测试对照），构建时打进各自的包里，不单独发布。
+
+开发需要 Node.js 20+ 和 pnpm（版本见根目录 `package.json` 的 `packageManager`）：
+
+```bash
+pnpm install
+pnpm typecheck && pnpm test && pnpm build
+pnpm dev:admin     # 管理台
+pnpm dev:mcp       # 本地 MCP Apps 宿主，在模拟对话里预览嵌入式审阅界面
+```
+
+### 发布
+
+每个包有自己的 GitHub Actions 工作流，互不影响：
+
+| 包 | 工作流 | 触发 |
+| --- | --- | --- |
+| admin-ui | `.github/workflows/release-admin-ui.yml` | 推送 tag `admin-ui-v<版本>`，或手动运行（默认 dry run） |
+| mcp-ui | `.github/workflows/release-mcp-ui.yml` | 推送 tag `mcp-ui-v<版本>`，或手动运行（默认 dry run） |
+
+发布走 npm Trusted Publishing：GitHub Actions 用 OIDC 换一次短寿命凭证，不在仓库里保存 npm 令牌。每个包要在 npm 的 Trusted Publisher 里授权对应的工作流文件（`release-admin-ui.yml`、`release-mcp-ui.yml`），并允许直接 `npm publish`。仓库必须公开，provenance 才会生成。
+
+发布步骤：改 `packages/<包>/package.json` 的 `version`，提交，然后打对应的 tag，例如 `git tag admin-ui-v0.1.0 && git push origin admin-ui-v0.1.0`。工作流会检查 tag 与版本一致、该版本尚未发布，跑类型检查、测试、构建，用打包出的 tarball 冒烟测试 CLI，再发布。`ci.yml` 在每次推送和 PR 时跑同样的检查。包必须先在 npm 上存在，才能配置 Trusted Publisher，所以每个包的第一个版本在本机用两步验证发布一次。
+
 ## 运行假设
 
 第一版面向 Cursor 里的 agent：用本地会话索引定位聊天，用全文记录抽取内容，结构图默认用 Mermaid，复杂图用 draw.io 编辑后导出回文章目录，插图只有在用户明确要求时才生成。工具缺失时，改为用户粘贴材料和手写图源，文章的数据模型不变。

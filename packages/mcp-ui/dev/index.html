@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>MCP Apps 开发宿主 · chat-to-article</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, "PingFang SC", sans-serif; }
+      body { margin: 0; background: #f5f5f4; color: #1c1917; }
+      body.dark { background: #0c0a09; color: #e7e5e4; }
+      header { position: sticky; top: 0; z-index: 5; display: flex; gap: 8px; align-items: center; padding: 10px 16px; background: inherit; border-bottom: 1px solid #d6d3d1; }
+      header h1 { font-size: 14px; margin: 0 auto 0 0; }
+      #chat { margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+      .msg { border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+      .user { align-self: flex-end; max-width: 80%; background: #d1fae5; color: #064e3b; }
+      .agent { background: transparent; border: 1px dashed #a8a29e; }
+      .tool { border: 1px solid #d6d3d1; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.6); }
+      body.dark .tool { background: rgba(28,25,23,.6); border-color: #44403c; }
+      .tool summary { padding: 6px 12px; font: 12px ui-monospace, monospace; color: #78716c; cursor: pointer; }
+      .tool pre { margin: 0; padding: 8px 12px; font-size: 11px; white-space: pre-wrap; border-top: 1px solid #e7e5e4; }
+      .tool iframe { display: block; width: 100%; border: 0; border-top: 1px solid #e7e5e4; height: 120px; }
+      .tool.fullscreen iframe { position: fixed; inset: 0; z-index: 10; height: 100vh !important; background: #fff; }
+      body.dark .tool.fullscreen iframe { background: #0c0a09; }
+      .context { font-size: 11px; color: #78716c; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>MCP Apps 开发宿主</h1>
+      <label>宽度 <select id="width"><option value="560">560</option><option value="760" selected>760</option><option value="1100">1100</option></select></label>
+      <select id="demo"></select>
+      <button id="call" type="button">agent 调用工具</button>
+      <button id="remount" type="button">重新渲染视图</button>
+      <button id="theme" type="button">切换明暗</button>
+    </header>
+    <main id="chat"></main>
+    <script type="module" src="./host.ts"></script>
+  </body>
+</html>

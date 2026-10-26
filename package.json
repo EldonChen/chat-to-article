@@ -1,0 +1,19 @@
+{
+  "name": "chat-to-article-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "dev:admin": "pnpm --filter @liem-opc/chat-to-article-admin-ui dev",
+    "dev:mcp": "pnpm --filter @liem-opc/chat-to-article-mcp-ui dev"
+  }
+}

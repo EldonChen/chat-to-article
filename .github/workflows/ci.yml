@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "skills/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - "packages/**"
+      - "skills/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  web-apps:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - name: Smoke-test packed CLIs
+        run: |
+          for pkg in admin-ui mcp-ui; do
+            (cd packages/$pkg && pnpm pack --pack-destination "$RUNNER_TEMP")
+          done
+          mkdir -p "$RUNNER_TEMP/smoke" && cd "$RUNNER_TEMP/smoke"
+          npm init -y > /dev/null
+          npm install "$RUNNER_TEMP"/liem-opc-chat-to-article-*.tgz
+          npx chat-to-article-admin-ui --help
+          npx chat-to-article-mcp-ui --help
