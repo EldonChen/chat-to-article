@@ -1,6 +1,6 @@
 {
   "name": "@liem-opc/chat-to-article-admin-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "聊出文章来（chat-to-article）的本地只读管理台：查看声音目录、词表与当前目录下的文章，并导出 Markdown。",
   "keywords": ["chat-to-article", "writing", "agent-skill", "admin", "markdown"],
   "license": "MIT",
