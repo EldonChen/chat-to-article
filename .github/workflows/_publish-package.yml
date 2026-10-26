@@ -68,7 +68,15 @@ jobs:
           npx "$bin" --help
 
       # 不设置 NODE_AUTH_TOKEN。pnpm 只要看到静态令牌就会跳过 OIDC。
-      # Trusted Publishing 在公开仓库上会自动附带 provenance。
+      # 运行器自带的 npm 10 不会用 GitHub OIDC 登录；Trusted Publishing 需要 npm 11.5.1 及以上。
+      # 公开仓库上，这次登录会自动附带 provenance。
       - name: Publish
         working-directory: packages/${{ inputs.package-dir }}
-        run: pnpm publish --registry https://registry.npmjs.org --access public --no-git-checks --provenance ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: |
+          if [[ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]]; then
+            echo "::error::作业没有 OIDC 令牌。检查工作流是否声明了 id-token: write。"
+            exit 1
+          fi
+          npm install -g npm@11.15.0
+          npm --version
+          pnpm publish --registry https://registry.npmjs.org --access public --no-git-checks --provenance ${{ inputs.dry-run && '--dry-run' || '' }}
