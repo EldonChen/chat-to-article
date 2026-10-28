@@ -19,4 +19,5 @@ jobs:
     with:
       package-dir: mcp-ui
       tag-prefix: mcp-ui-v
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
+      # API 传入的布尔值是字符串 "true"/"false"，不能直接当布尔用。
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && (inputs.dry-run == true || inputs.dry-run == 'true') }}

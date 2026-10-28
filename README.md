@@ -80,16 +80,34 @@ pnpm dev:mcp       # 本地 MCP Apps 宿主，在模拟对话里预览嵌入式�
 
 ### 发布
 
-每个包有自己的 GitHub Actions 工作流，互不影响：
+推到 `main` 且提交说明符合约定式提交时，GitHub Actions 会自己改版本号、打 tag 并发布。不需要手改 `package.json` 的 `version`。
 
-| 包 | 工作流 | 触发 |
-| --- | --- | --- |
-| admin-ui | `.github/workflows/release-admin-ui.yml` | 推送 tag `admin-ui-v<版本>`，或手动运行（默认 dry run） |
-| mcp-ui | `.github/workflows/release-mcp-ui.yml` | 推送 tag `mcp-ui-v<版本>`，或手动运行（默认 dry run） |
+| 提交说明 | 版本 |
+| --- | --- |
+| `fix:`、`perf:` | 补丁版本，0.1.0 → 0.1.1 |
+| `feat:` | 次版本，0.1.0 → 0.2.0 |
+| `feat!:` 或正文里的 `BREAKING CHANGE:` | 主版本，0.2.0 → 1.0.0 |
 
-发布走 npm Trusted Publishing：GitHub Actions 用 OIDC 换一次短寿命凭证，不在仓库里保存 npm 令牌。每个包要在 npm 的 Trusted Publisher 里授权对应的工作流文件（`release-admin-ui.yml`、`release-mcp-ui.yml`），并允许直接 `npm publish`。仓库必须公开，provenance 才会生成。
+其他类型（`chore:`、`docs:`、`refactor:`、`test:`）不发布。说明写在第一行，例如 `feat: 增加多版笔调审阅`。
 
-发布步骤：改 `packages/<包>/package.json` 的 `version`，提交，然后打对应的 tag，例如 `git tag admin-ui-v0.1.0 && git push origin admin-ui-v0.1.0`。工作流会检查 tag 与版本一致、该版本尚未发布，跑类型检查、测试、构建，用打包出的 tarball 冒烟测试 CLI，再发布。`ci.yml` 在每次推送和 PR 时跑同样的检查。包必须先在 npm 上存在，才能配置 Trusted Publisher，所以每个包的第一个版本在本机用两步验证发布一次。
+哪个包发布看改了哪些文件，不看 scope：
+
+| 改动路径 | 发布 |
+| --- | --- |
+| `packages/mcp-ui/**` | mcp-ui |
+| `packages/admin-ui/**` | admin-ui |
+| `packages/core/**`、`tsconfig.base.json` | 两个都发 |
+| `skills/**`、`docs/**` | 不发 |
+
+`packages/core` 不单独上 npm，构建时打进两个包里。
+
+流程在 `.github/workflows/release.yml`：semantic-release 把新版本写进对应的 `package.json`，提交（信息里带 `[skip ci]`，不会再次触发自己），打 `mcp-ui-v*` 或 `admin-ui-v*` tag，然后启动原来的发布工作流。上传 npm 仍然由 `release-mcp-ui.yml` 和 `release-admin-ui.yml` 完成，因为 npm Trusted Publisher 授权的是这两个文件。用的是 Actions 自带的 `GITHUB_TOKEN`，这种令牌打的 tag 不会再触发工作流，所以不会发两次。
+
+第一次在 `main` 上运行时，如果某个包还没有 tag，会按 `package.json` 里的版本在当前提交打一个基线 tag，不上传 npm。之后的提交才开始计算版本。
+
+手动补发仍可用：Actions 里运行对应的 Release 工作流，取消 dry run；或推送 tag `mcp-ui-v<版本>` / `admin-ui-v<版本>`。发布工作流会核对 tag 与版本一致、该版本还没上过 npm，然后跑类型检查、测试、构建和 CLI 冒烟测试。
+
+发布走 npm Trusted Publishing，仓库里不保存 npm 令牌。仓库必须公开，provenance 才会生成。包必须先在 npm 上存在，才能配置 Trusted Publisher，所以每个包的第一个版本仍要在本机发一次。`main` 需要允许 GitHub Actions 直接推送版本号提交；如果开了分支保护，要放行 `github-actions[bot]`。
 
 ## 运行假设
 

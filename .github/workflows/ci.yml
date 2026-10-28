@@ -10,6 +10,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
+      - "scripts/**"
       - ".github/workflows/**"
   pull_request:
     paths:
@@ -19,6 +20,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig.base.json"
+      - "scripts/**"
       - ".github/workflows/**"
 
 permissions:
@@ -40,6 +42,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: node --test scripts/release-filter.test.mjs
       - run: pnpm build
       - name: Smoke-test packed CLIs
         run: |
