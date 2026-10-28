@@ -67,10 +67,11 @@ jobs:
           bin=$(node -p "Object.keys(require('${{ steps.meta.outputs.name }}/package.json').bin)[0]")
           npx "$bin" --help
 
-      # 不设置 NODE_AUTH_TOKEN。pnpm 只要看到静态令牌就会跳过 OIDC。
-      # 运行器自带的 npm 10 不会用 GitHub OIDC 登录；Trusted Publishing 需要 npm 11.5.1 及以上。
-      # 公开仓库上，这次登录会自动附带 provenance。
-      - name: Publish
+      # 不设置 NODE_AUTH_TOKEN。静态令牌会让 npm 跳过 OIDC。
+      # 运行器自带的 npm 10 不会用 GitHub OIDC 登录；stage publish 需要 npm 11.15.0 及以上。
+      # 先用 pnpm pack：它会把 workspace: 协议改写成普通版本号。npm stage publish 不认识工作区。
+      # 公开仓库上，OIDC 会自动附带 provenance。批准之前，这个版本不能被安装。
+      - name: Stage on npm
         working-directory: packages/${{ inputs.package-dir }}
         run: |
           if [[ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]]; then
@@ -79,4 +80,14 @@ jobs:
           fi
           npm install -g npm@11.15.0
           npm --version
-          pnpm publish --registry https://registry.npmjs.org --access public --no-git-checks --provenance ${{ inputs.dry-run && '--dry-run' || '' }}
+          pack="$RUNNER_TEMP/stage-pack"
+          mkdir -p "$pack"
+          pnpm pack --pack-destination "$pack"
+          args=(--registry https://registry.npmjs.org --access public --provenance)
+          if [[ "${{ inputs.dry-run }}" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          npm stage publish "$pack"/*.tgz "${args[@]}"
+          if [[ "${{ inputs.dry-run }}" != "true" ]]; then
+            echo "::notice title=等待批准::${{ steps.meta.outputs.name }}@${{ steps.meta.outputs.version }} 已进入 npm 待审队列。打开包页面的 Staged Packages，核对后点 Approve。"
+          fi

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: Run every step but skip the actual npm upload
+        description: 跑完检查和构建，但不提交到 npm 待审队列
         type: boolean
         default: true
 

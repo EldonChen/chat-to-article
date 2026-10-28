@@ -167,8 +167,9 @@ async function publish(pkg, release) {
     await sleep(15000);
     run = await github(`/repos/${repository}/actions/runs/${run.id}`);
   }
-  if (run.conclusion !== "success") throw new Error(`${pkg.id} 发布失败：${run.html_url}`);
-  console.log(`${pkg.id} 已发布：${run.html_url}`);
+  if (run.conclusion !== "success") throw new Error(`${pkg.id} 提交待审失败：${run.html_url}`);
+  console.log(`${pkg.id} 已进入 npm 待审队列：${run.html_url}`);
+  console.log("在 npm 包页面的 Staged Packages 里批准后，这个版本才能被安装。");
 }
 
 async function main() {

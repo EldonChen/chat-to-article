@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: 只计算会发布什么，不打 tag、不上传 npm
+        description: 只计算会发布什么，不打 tag、不提交待审
         type: boolean
         default: true
 

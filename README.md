@@ -80,7 +80,7 @@ pnpm dev:mcp       # 本地 MCP Apps 宿主，在模拟对话里预览嵌入式�
 
 ### 发布
 
-推到 `main` 且提交说明符合约定式提交时，GitHub Actions 会自己改版本号、打 tag 并发布。不需要手改 `package.json` 的 `version`。
+推到 `main` 且提交说明符合约定式提交时，GitHub Actions 会自己改版本号、打 tag，并把包放进 npm 待审队列。不需要手改 `package.json` 的 `version`。工作流成功只表示包已待审；在 npm 包页面的 Staged Packages 里点 Approve 并完成两步验证之后，这个版本才能被安装。
 
 | 提交说明 | 版本 |
 | --- | --- |
@@ -101,13 +101,13 @@ pnpm dev:mcp       # 本地 MCP Apps 宿主，在模拟对话里预览嵌入式�
 
 `packages/core` 不单独上 npm，构建时打进两个包里。
 
-流程在 `.github/workflows/release.yml`：semantic-release 把新版本写进对应的 `package.json`，提交（信息里带 `[skip ci]`，不会再次触发自己），打 `mcp-ui-v*` 或 `admin-ui-v*` tag，然后启动原来的发布工作流。上传 npm 仍然由 `release-mcp-ui.yml` 和 `release-admin-ui.yml` 完成，因为 npm Trusted Publisher 授权的是这两个文件。用的是 Actions 自带的 `GITHUB_TOKEN`，这种令牌打的 tag 不会再触发工作流，所以不会发两次。
+流程在 `.github/workflows/release.yml`：semantic-release 把新版本写进对应的 `package.json`，提交（信息里带 `[skip ci]`，不会再次触发自己），打 `mcp-ui-v*` 或 `admin-ui-v*` tag，然后启动原来的发布工作流。提交待审仍然由 `release-mcp-ui.yml` 和 `release-admin-ui.yml` 完成，因为 npm Trusted Publisher 授权的是这两个文件。用的是 Actions 自带的 `GITHUB_TOKEN`，这种令牌打的 tag 不会再触发工作流，所以不会提交两次。
 
 第一次在 `main` 上运行时，如果某个包还没有 tag，会按 `package.json` 里的版本在当前提交打一个基线 tag，不上传 npm。之后的提交才开始计算版本。
 
-手动补发仍可用：Actions 里运行对应的 Release 工作流，取消 dry run；或推送 tag `mcp-ui-v<版本>` / `admin-ui-v<版本>`。发布工作流会核对 tag 与版本一致、该版本还没上过 npm，然后跑类型检查、测试、构建和 CLI 冒烟测试。
+手动补发仍可用：Actions 里运行对应的 Release 工作流，取消 dry run；或推送 tag `mcp-ui-v<版本>` / `admin-ui-v<版本>`。发布工作流会核对 tag 与版本一致、该版本还没上过 npm，然后跑类型检查、测试、构建和 CLI 冒烟测试，最后执行 `npm stage publish`。
 
-发布走 npm Trusted Publishing，仓库里不保存 npm 令牌。仓库必须公开，provenance 才会生成。包必须先在 npm 上存在，才能配置 Trusted Publisher，所以每个包的第一个版本仍要在本机发一次。`main` 需要允许 GitHub Actions 直接推送版本号提交；如果开了分支保护，要放行 `github-actions[bot]`。
+发布走 npm Trusted Publishing，仓库里不保存 npm 令牌。可信发布保持只允许 `npm stage publish`。仓库必须公开，provenance 才会生成。包必须先在 npm 上存在，才能配置 Trusted Publisher，所以每个包的第一个版本仍要在本机发一次。`main` 需要允许 GitHub Actions 直接推送版本号提交；如果开了分支保护，要放行 `github-actions[bot]`。
 
 ## 运行假设
 
