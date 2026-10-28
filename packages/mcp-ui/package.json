@@ -1,6 +1,6 @@
 {
   "name": "@liem-opc/chat-to-article-mcp-ui",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "聊出文章来（chat-to-article）的 MCP App：把写作计划、主张、大纲、正文块、插图和风格候选变成嵌在 agent 对话里的审阅界面，支持修订模式编辑与批注。",
   "keywords": [
     "chat-to-article",
