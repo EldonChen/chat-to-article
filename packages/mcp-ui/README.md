@@ -24,6 +24,7 @@
 | `review_writing_plan` | 文体标签、读者、目的、七条偏好轴、备选行文方案；每项都能批注 | 确认计划 / 让 agent 再想想 / 先不写 | 确认后写 `writing-plan.json` |
 | `review_claims` | 每条主张：采用 / 待定 / 有疑问 / 不要，可改字、批注、补一条；疑似密钥要勾选「已处理」；提示哪些块会因此过期 | 提交决定 / 让 agent 再查 | 调用时把新主张以 candidate 写入 `claims.jsonl`；提交时写入决定和 `materials.json` |
 | `review_outline` | 章节排序、增删、主张和图的分配、块拆分；未覆盖的主张 | 确认大纲 / 让 agent 重排 | 确认后写 `outline.json` 和图位 |
+| `review_variants` | 同一块的 2–4 种笔调并排，标出「按你的偏好」那一版；每版可写喜欢或不喜欢的地方 | 就用这版 / 都不满意，换一组 / 稍后再说 | 调用时不写文件；选定后把那版以 draft 写入 `blocks/<id>.md`，返回 `pick-variant` 命令 |
 | `review_block` | 所见即所得的修订模式：直接改字留痕（插入下划线、删除线），逐处或全部接受/拒绝；选中文字加批注；词表实时检查；前后块只读；与上一版的差异 | 接受这块 / 按批注修改 / 稍后再说 | 调用时以 draft 写入 `blocks/<id>.md`；提交时保存你的修改 |
 | `review_figure` | Mermaid 实时预览、源文件、图注、替代文字 | 接受这张图 / 让 agent 改 / 稍后再说 | 调用时写图源；提交时更新 `figures/manifest.json` |
 | `review_style_candidates` | 每条候选：写进风格 / 再观察 / 不是我的习惯，措辞可改 | 提交 / 稍后再说 | 不写文件，返回 `bump-style` 命令 |

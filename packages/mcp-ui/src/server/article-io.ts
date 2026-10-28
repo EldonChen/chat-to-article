@@ -12,6 +12,7 @@ import {
   loadSharedLexicon,
   loadVoice,
   readJson,
+  readJsonl,
   readText,
   resolveVoiceHome,
   writeJson,
@@ -67,6 +68,13 @@ export function pinnedProfile(meta: ArticleMeta | null): Profile | null {
   if (!voice.profile) return null;
   if (!meta || voice.profile.revision === meta.styleRevision) return voice.profile;
   return voice.history.find((h) => h.revision === meta.styleRevision)?.profile ?? voice.profile;
+}
+
+/** 本篇已记下、仍生效的偏好（cta.py learn 写入），不含笔调选择本身。 */
+export function articlePreferences(dir: string): { id: string; text: string }[] {
+  return readJsonl<{ id: string; text: string; kind?: string; status?: string }>(join(dir, "preferences.jsonl"))
+    .filter((p) => p.status === "active" && p.kind !== "voice")
+    .map((p) => ({ id: p.id, text: p.text }));
 }
 
 export function outlineBlockIds(dir: string): string[] {

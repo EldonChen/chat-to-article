@@ -2,7 +2,8 @@
 name: chat-to-article
 description: >-
   把某个主题下的过往聊天整理成可回顾、可共享的文章，并按块修订。
-  维护版本化的个人写作风格、共享与私有词表，以及 Mermaid、draw.io 和经确认的插图。
+  首块出多版让作者挑笔调，随批注即时沉淀偏好；维护版本化的个人写作风格、
+  共享与私有词表，以及 Mermaid、draw.io 和经确认的插图。
   在用户要把聊天整理成文章、从聊天写文章、按段改文章、回顾一个主题的对话，
   或修改文章中的某一段、某一张图时使用。
 ---
@@ -25,6 +26,8 @@ python3 <skill>/scripts/cta.py <子命令>
 
 - 新主题成文 → 下面的清单
 - 改已有的一块或一张图 → [revision.md](references/revision.md)
+- 第一块出多版让作者挑笔调、避免机械腔、篇幅怎么定 → [voices.md](references/voices.md)
+- 作者的批注、修改和选择怎么沉淀成偏好 → [preferences.md](references/preferences.md)
 - 从旧文学习笔调、或确认风格候选 → [style.md](references/style.md)
 - 禁用词、习惯说法、放行 → [lexicon.md](references/lexicon.md)
 - 图的类型和文件 → [figures.md](references/figures.md)
@@ -45,7 +48,8 @@ python3 <skill>/scripts/cta.py <子命令>
 - [ ] 材料覆盖
 - [ ] 主张确认
 - [ ] 大纲确认
-- [ ] 第一节审完
+- [ ] 第一块出多版，作者选定笔调
+- [ ] 第一节审完，偏好问过是否写进风格档案
 - [ ] 其余节
 - [ ] 词表
 - [ ] 风格候选
@@ -98,7 +102,7 @@ python3 <skill>/scripts/cta.py check-sources --article articles/<slug>
 python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --claims
 ```
 
-大纲写入 `outline.json`，图记录写入 `figures/manifest.json`。用户确认结构之后：
+大纲写入 `outline.json`，图记录写入 `figures/manifest.json`。块是一个意思完整的单元，不是一个段落：一节分几块、一块写几段，按主张和材料多少来定，不要在各节之间平均分配。用户确认结构之后：
 
 ```bash
 python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --outline
@@ -108,14 +112,23 @@ python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --outline
 
 ### 起草
 
-写每一块之前运行 `show-block`。它只给出钉住的风格版本、生效规则、范文、这块的主张，以及前后块的只读正文。不要另读整篇 `article.md` 来改写。
+写每一块之前运行 `show-block`。它只给出钉住的风格版本、生效规则、范文、本篇选定的笔调、本篇已记下的偏好、这块的主张，以及前后块的只读正文。不要另读整篇 `article.md` 来改写。
 
 ```bash
 python3 <skill>/scripts/cta.py check-draft --article articles/<slug> --section first
 python3 <skill>/scripts/cta.py show-block --article articles/<slug> --block b001
 ```
 
-正文只使用这块 `claimIds` 里已经接受的主张。段落落在风格档案的字数范围内。写完把文件存成 `blocks/<id>.md`，一次只给用户看这一块。
+`show-block` 提示本篇还没选定笔调时，这块不要只写一版：按 [voices.md](references/voices.md) 运行 `variant-brief`，出 3 版让用户挑。有偏好材料时，其中一版必须按用户的偏好写。用户选定后运行 `pick-variant`。
+
+正文只使用这块 `claimIds` 里已经接受的主张。篇幅跟着内容走，不要为了字数增删内容，也不要把每段写成一样长；起草后按 [voices.md](references/voices.md) 的「机械腔从哪来」自查一遍。写完把文件存成 `blocks/<id>.md`，一次只给用户看这一块。
+
+**每次用户给了反馈，都先沉淀偏好，再动笔。** 批注、亲手改的字、选版本时的评价、对话里的指令，都按 [preferences.md](references/preferences.md) 归纳成能推广的写法，用 `learn` 记下。这样下一块的 `show-block` 就会带上它，不用等整篇结束：
+
+```bash
+python3 <skill>/scripts/cta.py learn --article articles/<slug> --block b001 --source annotation \
+  --text "讲经过时用我的原话" --evidence "改前 → 改后"
+```
 
 用户接受后：
 
@@ -123,7 +136,7 @@ python3 <skill>/scripts/cta.py show-block --article articles/<slug> --block b001
 python3 <skill>/scripts/cta.py accept-block --article articles/<slug> --block b001
 ```
 
-默认先完成第一节。`check-draft --section rest` 失败时，不要写后面的节。用户明确说「按当前风格写完」之后，才运行 `allow-write-all`，然后再写其余节。其余节仍然一块一块给用户看。
+第一节全部接受后，问用户是否把本篇记下的偏好写进风格档案（`accept-block` 会提示）。默认先完成第一节。`check-draft --section rest` 失败时，不要写后面的节。用户明确说「按当前风格写完」之后，才运行 `allow-write-all`，然后再写其余节。其余节仍然一块一块给用户看。
 
 ### 改一块
 
@@ -133,7 +146,7 @@ python3 <skill>/scripts/cta.py accept-block --article articles/<slug> --block b0
 
 `lint` 退出码 1 表示有禁用说法。只重写命中的那一句，同块其余句子保持原样。见 [lexicon.md](references/lexicon.md)。
 
-一篇结束时，把这次措辞修改收成候选，问用户哪些写入声音目录。写入用 `bump-style`。这个命令不修改已有文章的 `styleRevision`。
+一篇结束时，把还没写进档案的本篇偏好和其余措辞修改收成候选，问用户哪些写入声音目录。写入用 `bump-style`，来自本篇偏好的带上 `--article` 和 `--pref`。这个命令不修改已有文章的 `styleRevision`。
 
 ```bash
 python3 <skill>/scripts/cta.py lint --article articles/<slug>

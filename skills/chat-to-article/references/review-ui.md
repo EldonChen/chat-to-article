@@ -8,6 +8,7 @@
 | 写作计划 | `review_writing_plan` | 在对话里复述计划等确认 |
 | 主张 | `review_claims` | 手写 `claims.jsonl` 再逐条问 |
 | 大纲 | `review_outline` | 手写 `outline.json` 再问结构 |
+| 多版挑笔调 | `review_variants` | 在对话里依次贴几版再问选哪个 |
 | 每一块 | `review_block` | 写 `blocks/<id>.md` 后把正文贴给用户 |
 | 图 | `review_figure` | 贴图源再问 |
 | 风格候选 | `review_style_candidates` | 列候选让用户挑 |
@@ -19,6 +20,7 @@
 - 用户说已经提交，对话里却没有结果，就调用 `get_review_result`（sessionId 在工具返回值里）。
 - 工具返回值说客户端没有声明支持 MCP Apps 时，先问用户能否看到界面。看不到就按原流程在对话里审阅；工具已写入的草稿照常有效。
 - 门禁仍然用 `cta.py`。提交结果里写了下一步命令，例如 `set-gate --plan`、`accept-block`、`bump-style`，照着运行。工具不会替你通过门禁。
-- `review_block` 调用时会以 draft 写入块文件，起草门禁与 `check-draft` 相同。用户「按批注修改」时，结果给出用户亲手改过的正文（已存回块文件）、修订明细和批注：在这个正文上只改批注指到的地方，改完再次调用 `review_block`，`instruction` 写明这次改了什么。
+- `review_variants` 调用时不写块文件。用户选定后，选中的正文会以 draft 写入块文件，结果里给出 `pick-variant` 命令和用户对各版的评价：先运行命令，再把评价记成偏好，然后用 `review_block` 把选中的这版交给用户精修。
+- `review_block` 调用时会以 draft 写入块文件，起草门禁与 `check-draft` 相同。用户「按批注修改」时，结果给出用户亲手改过的正文（已存回块文件）、修订明细和批注：先按 [preferences.md](preferences.md) 把能推广的写法用 `learn` 记下，再在这个正文上修改，改完再次调用 `review_block`，`instruction` 写明这次改了什么。用户直接接受时，修订和批注里能推广的写法也要先记下，再写下一块。
 - 用户在界面上「接受这块」时，词表禁用说法已经在界面上拦过；`accept-block` 仍可能因为门禁失败，把脚本输出告诉用户。
 - 一次只开一个审阅。不要为了省事同时开整节或整篇。

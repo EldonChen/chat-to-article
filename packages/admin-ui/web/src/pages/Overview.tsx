@@ -145,9 +145,7 @@ export function OverviewPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex flex-wrap gap-1.5">
                   <StatusBadge status="active" label={`r${profile.revision}`} />
-                  {profile.person && <StatusBadge status="planned" label={profile.person} />}
-                  <StatusBadge status="planned" label={`段落 ${profile.paragraph?.minChars ?? "?"}–${profile.paragraph?.maxChars ?? "?"} 字`} />
-                </div>
+                  {profile.person && <StatusBadge status="planned" label={profile.person} />}                </div>
                 <ul className="space-y-1.5">
                   {(profile.rules ?? []).filter((r) => r.status === "active").slice(0, 4).map((r) => (
                     <li key={r.id} className="flex gap-2 text-stone-600 dark:text-stone-300">

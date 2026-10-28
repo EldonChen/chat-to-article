@@ -145,6 +145,37 @@ export function demoInputs(article: string): [ActionKind, Record<string, unknown
       },
     ],
     [
+      "review_variants",
+      {
+        article,
+        blockId: "b001",
+        context: "本篇还没选定笔调，第一块出三版。",
+        variants: [
+          {
+            id: "A",
+            voice: "profile",
+            label: "按你的偏好",
+            summary: "段首直接写具体问题，第一人称",
+            body: "我改文章时经常只想换掉一句，拿回来的却是整篇都被改过。所以正文按块保存，要改哪块就只交哪块。",
+          },
+          {
+            id: "B",
+            voice: "colleague",
+            label: "跟同事复盘",
+            summary: "更口语，保留当时的懊恼",
+            body: "说实话，最烦的就是只想改一句话，结果整篇都被动过，还得逐行对照才知道改了哪儿。\n\n后来干脆把正文拆成块存，改哪块交哪块。",
+          },
+          {
+            id: "C",
+            voice: "engineering",
+            label: "工程笔记",
+            summary: "结论先行，写清代价",
+            body: "正文按块存储，修订的最小单位是块。改动请求只携带目标块，相邻两块只读附带。代价是跨块改动要拆成多次请求。",
+          },
+        ],
+      },
+    ],
+    [
       "review_block",
       {
         article,

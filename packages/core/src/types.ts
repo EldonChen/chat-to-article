@@ -22,6 +22,7 @@ export interface WritingPlan {
   styleAxes: Record<string, string>;
   approach: string;
   openQuestions: string[];
+  voice?: { id: string; name?: string; note?: string };
 }
 
 export type ClaimStatus = "candidate" | "accepted" | "rejected" | "disputed";

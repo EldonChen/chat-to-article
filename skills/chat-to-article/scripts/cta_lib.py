@@ -85,7 +85,6 @@ def empty_profile(revision: int = 0) -> dict:
         "locale": "zh-CN",
         "audience": "",
         "person": "",
-        "paragraph": {"minChars": 80, "maxChars": 280},
         "structure": {"headingDepth": 2, "listPolicy": "能写成句子就写成句子"},
         "terms": [],
         "exemplarRefs": [],
@@ -525,6 +524,28 @@ def show_block(article: Path, voice: Path, block_id: str) -> str:
                 lines.append(path.read_text(encoding="utf-8").strip())
     else:
         lines.append("- （没有）")
+    lines.append("本篇笔调:")
+    chosen = (load_plan(article).get("voice") or {})
+    preset = preset_map().get(chosen.get("id", ""))
+    if preset:
+        lines.append(f"- {preset['id']}「{preset['name']}」：{preset['summary']}")
+        for trait in preset["traits"]:
+            lines.append(f"  - {trait}")
+        if preset.get("avoid"):
+            lines.append("  - 避免：" + "、".join(preset["avoid"]))
+    elif chosen.get("id"):
+        lines.append(f"- {chosen['id']}：{chosen.get('note') or '按作者的风格档案和本篇偏好'}")
+    else:
+        lines.append("- 还没选定。这块先运行 variant-brief，按 references/voices.md 出多版让作者挑。")
+    if preset and chosen.get("note"):
+        lines.append(f"  - 作者补充：{chosen['note']}")
+    lines.append("本篇偏好（作者在这篇里教过的写法，和上面的规则冲突时以这里为准）:")
+    prefs = [row for row in load_preferences(article) if row.get("status") == "active" and row.get("kind") != "voice"]
+    if prefs:
+        for row in prefs:
+            lines.append(f"- {row['id']}: {row['text']}")
+    else:
+        lines.append("- （还没有）")
     if block_path(article, block_id).exists():
         block_meta, body = load_block(article, block_id)
         lines.append(f"status: {block_meta['status']}")
@@ -581,6 +602,204 @@ def rewrite_block(article: Path, block_id: str, body: str, instruction: str) -> 
         lineterm="",
     )
     return "\n".join(diff) + "\n"
+
+
+def load_plan(article: Path) -> dict:
+    path = article / "writing-plan.json"
+    return read_json(path) if path.exists() else {}
+
+
+def load_presets() -> list[dict]:
+    return read_json(skill_root() / "styles" / "presets.json")["presets"]
+
+
+def preset_map() -> dict:
+    return {preset["id"]: preset for preset in load_presets()}
+
+
+def load_preferences(article: Path) -> list:
+    return read_jsonl(article / "preferences.jsonl")
+
+
+def format_presets() -> str:
+    lines = []
+    for preset in load_presets():
+        lines.append(f"## {preset['id']}「{preset['name']}」")
+        lines.append(f"适合：{'、'.join(preset['fits'])}")
+        lines.append(preset["summary"])
+        for trait in preset["traits"]:
+            lines.append(f"- {trait}")
+        lines.append("避免：" + "、".join(preset["avoid"]))
+        lines.append("样稿：")
+        lines.append(preset["sample"])
+        lines.append("")
+    return "\n".join(lines)
+
+
+def learn_preference(article: Path, voice: Path, text: str, evidence: str, block_id: str, source: str, kind: str = "rule") -> tuple[int, str]:
+    text = text.strip()
+    if not text:
+        return 1, "偏好是空的。\n"
+    rows = load_preferences(article)
+    for row in rows:
+        if row.get("status") == "active" and row.get("text") == text:
+            return 0, f"已经记过：{row['id']}\n"
+    pref_id = f"p{len(rows) + 1}"
+    rows.append(
+        {
+            "id": pref_id,
+            "text": text,
+            "kind": kind,
+            "source": source,
+            "blockId": block_id,
+            "evidence": evidence,
+            "status": "active",
+            "promoted": False,
+        }
+    )
+    write_jsonl(article / "preferences.jsonl", rows)
+    if kind != "voice":
+        ensure_voice(voice)
+        slug = load_meta(article).get("slug", article.name)
+        candidates = read_jsonl(voice / "candidates.jsonl")
+        candidates.append(
+            {
+                "id": f"cand-{slug}-{pref_id}",
+                "text": text,
+                "status": "candidate",
+                "source": "article",
+                "article": slug,
+                "evidence": evidence,
+            }
+        )
+        write_jsonl(voice / "candidates.jsonl", candidates)
+    return 0, f"已记下 {pref_id}：{text}\n"
+
+
+def forget_preference(article: Path, pref_id: str) -> tuple[int, str]:
+    rows = load_preferences(article)
+    for row in rows:
+        if row["id"] == pref_id:
+            row["status"] = "retired"
+            write_jsonl(article / "preferences.jsonl", rows)
+            return 0, f"已停用 {pref_id}：{row['text']}\n"
+    return 1, f"没有偏好 {pref_id}。\n"
+
+
+def _mark_promoted(article: Path, voice: Path, pref_id: str) -> bool:
+    rows = load_preferences(article)
+    row = next((item for item in rows if item["id"] == pref_id), None)
+    if not row:
+        return False
+    row["promoted"] = True
+    write_jsonl(article / "preferences.jsonl", rows)
+    slug = load_meta(article).get("slug", article.name)
+    candidates = read_jsonl(voice / "candidates.jsonl")
+    for item in candidates:
+        if item.get("id") == f"cand-{slug}-{pref_id}":
+            item["status"] = "accepted"
+    write_jsonl(voice / "candidates.jsonl", candidates)
+    return True
+
+
+def unpromoted_preferences(article: Path) -> list:
+    return [
+        row
+        for row in load_preferences(article)
+        if row.get("status") == "active" and row.get("kind") != "voice" and not row.get("promoted")
+    ]
+
+
+def pick_variant(article: Path, voice: Path, block_id: str, voice_id: str, body: str | None, note: str) -> tuple[int, str]:
+    presets = preset_map()
+    if voice_id not in presets and voice_id not in ("profile", "custom"):
+        return 1, f"没有笔调 {voice_id}。可选：{'、'.join(presets)}、profile、custom。\n"
+    if voice_id == "custom" and not note.strip():
+        return 1, "custom 要用 --note 写清楚是什么笔调。\n"
+    outline = load_outline(article)
+    if block_id not in outline_block_ids(outline):
+        return 1, f"大纲里没有块 {block_id}。\n"
+    path = block_path(article, block_id)
+    if body is not None:
+        if path.exists():
+            rewrite_block(article, block_id, body, f"作者从多版中选了 {voice_id}")
+        else:
+            section = next(s for s in outline["sections"] if block_id in s.get("blockIds", []))
+            meta = {"id": block_id, "status": "draft", "claimIds": section.get("claimIds", []), "figureIds": []}
+            save_block(article, meta, body.strip() + "\n")
+    elif not path.exists():
+        return 1, f"{block_id} 还没有正文，用 --body-file 给出选中的那版。\n"
+
+    plan = load_plan(article)
+    plan["voice"] = {"id": voice_id, "name": presets[voice_id]["name"] if voice_id in presets else voice_id, "note": note.strip()}
+    write_json(article / "writing-plan.json", plan)
+    rows = load_preferences(article)
+    for row in rows:
+        if row.get("kind") == "voice" and row.get("status") == "active":
+            row["status"] = "retired"
+    write_jsonl(article / "preferences.jsonl", rows)
+    if voice_id in presets:
+        text = f"笔调用「{presets[voice_id]['name']}」：{presets[voice_id]['summary']}"
+    elif voice_id == "profile":
+        text = "笔调按作者的风格档案和本篇偏好写"
+    else:
+        text = f"笔调：{note.strip()}"
+    learn_preference(article, voice, text, note.strip(), block_id, "variant", kind="voice")
+    meta = load_meta(article)
+    meta["variantRounds"] = int(meta.get("variantRounds", 0)) + 1
+    save_meta(article, meta)
+    return 0, (
+        f"本篇笔调定为 {plan['voice']['name']}，{block_id} 已存为草稿。\n"
+        "把作者对各版的评价记成偏好（learn），再把这块交给作者精修。\n"
+    )
+
+
+def variant_brief(article: Path, voice: Path, block_id: str) -> str:
+    meta = load_meta(article)
+    profile = load_pinned(voice, meta["styleRevision"])
+    plan = load_plan(article)
+    rules = _active_rules(profile)
+    exemplars = [ref for ref in profile.get("exemplarRefs", []) if (voice / ref).exists()]
+    prefs = [row for row in load_preferences(article) if row.get("status") == "active" and row.get("kind") != "voice"]
+    slug = meta.get("slug", article.name)
+    pending = [
+        row
+        for row in read_jsonl(voice / "candidates.jsonl")
+        if row.get("status") == "candidate" and row.get("article") != slug
+    ][-10:]
+    personal = bool(rules or exemplars or prefs or pending)
+    chosen = plan.get("voice") or {}
+
+    lines = [f"# 多版起草 {block_id}"]
+    if chosen.get("id"):
+        lines.append(f"本篇已选定笔调：{chosen.get('name') or chosen['id']}。通常只写一版；按 references/voices.md 判断要不要再出 2 版。")
+    elif personal:
+        lines.append("出 3 版：1 版「按你的偏好」，2 版内置笔调。")
+    else:
+        lines.append("出 3 版内置笔调。还没有可用的偏好材料，所以没有「按你的偏好」那一版。")
+    if plan.get("genre"):
+        lines.append("本篇文体：" + "、".join(plan["genre"]))
+    if plan.get("styleAxes"):
+        lines.append("已确认的偏好轴：" + "；".join(f"{k}={v}" for k, v in plan["styleAxes"].items()))
+
+    if personal:
+        lines.append("")
+        lines.append("「按你的偏好」那一版的材料:")
+        for rule in rules:
+            lines.append(f"- 风格规则 {rule['id']}: {rule['text']}")
+        for ref in exemplars:
+            lines.append(f"- 范文 {ref}:")
+            lines.append((voice / ref).read_text(encoding="utf-8").strip())
+        for row in prefs:
+            lines.append(f"- 本篇偏好 {row['id']}: {row['text']}")
+        for row in pending:
+            lines.append(f"- 以往文章的候选（作者还没确认，只在这一版里试用）: {row['text']}")
+
+    lines.append("")
+    lines.append("内置笔调（详见 presets 命令）:")
+    for preset in load_presets():
+        lines.append(f"- {preset['id']}「{preset['name']}」适合{'、'.join(preset['fits'])}：{preset['summary']}")
+    return "\n".join(lines) + "\n"
 
 
 def _compiled_lexicon(voice: Path) -> list[dict]:
@@ -722,7 +941,14 @@ def accept_block(article: Path, voice: Path, block_id: str) -> tuple[int, str]:
     article_meta = load_meta(article)
     article_meta["phase"] = "review"
     save_meta(article, article_meta)
-    return 0, f"已接受 {block_id}。\n"
+    message = f"已接受 {block_id}。\n"
+    first = load_outline(article)["sections"][0].get("blockIds", [])
+    pending = unpromoted_preferences(article)
+    if block_id in first and pending and all(
+        block_path(article, item).exists() and load_block(article, item)[0].get("status") == "accepted" for item in first
+    ):
+        message += f"第一节已全部接受。本篇有 {len(pending)} 条偏好还没写进风格档案，问作者要不要写入（见 references/preferences.md）。\n"
+    return 0, message
 
 
 def mark_claim(article: Path, claim_id: str, status: str | None, text: str | None, resolved: bool | None) -> tuple[int, str]:
@@ -1024,9 +1250,7 @@ def observe_style(voice: Path, paths: list[Path]) -> str:
     median = lengths[len(lengths) // 2]
     person = "第一人称" if wo >= wo_men else "我们"
     depth = max(depths) if depths else 0
-    band = [item for item in paragraphs if 80 <= len(item) <= 280]
-    band.sort(key=lambda item: abs(len(item) - median))
-    exemplars = band[:3]
+    exemplars = sorted(paragraphs, key=lambda item: abs(len(item) - median))[:3]
     row = {
         "id": f"cand-observe-{profile['revision']}-{len(read_jsonl(voice / 'candidates.jsonl')) + 1}",
         "text": f"段长中位数约 {median} 字，标题最深 {depth} 级，人称偏向{person}",
@@ -1047,12 +1271,16 @@ def observe_style(voice: Path, paths: list[Path]) -> str:
         for item in exemplars:
             lines.append(f"- {item}")
     else:
-        lines.append("- （没有落在 80 到 280 字里的段落）")
+        lines.append("- （没有可用的段落）")
     lines.append("这是候选，风格版本没有变。")
     return "\n".join(lines) + "\n"
 
 
-def bump_style(voice: Path, rule_text: str) -> tuple[int, str]:
+def bump_style(voice: Path, rule_text: str, article: Path | None = None, pref_id: str | None = None) -> tuple[int, str]:
+    if pref_id and not article:
+        return 1, "--pref 要和 --article 一起用。\n"
+    if pref_id and not any(row["id"] == pref_id for row in load_preferences(article)):
+        return 1, f"没有偏好 {pref_id}。\n"
     profile = ensure_voice(voice)
     snapshot_profile(voice, profile)
     history = voice / "history" / f"r{profile['revision']}.json"
@@ -1070,6 +1298,8 @@ def bump_style(voice: Path, rule_text: str) -> tuple[int, str]:
     )
     write_json(voice / "profile.json", profile)
     snapshot_profile(voice, profile)
+    if pref_id:
+        _mark_promoted(article, voice, pref_id)
     return 0, f"风格版本现在是 {profile['revision']}。已有文章的 styleRevision 不会被这个命令修改。\n"
 
 

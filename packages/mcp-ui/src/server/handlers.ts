@@ -15,6 +15,8 @@ import {
   reviewOutlineResult,
   reviewStyleCandidatesArgs,
   reviewStyleCandidatesResult,
+  reviewVariantsArgs,
+  reviewVariantsResult,
   reviewWritingPlanArgs,
   reviewWritingPlanResult,
   type ActionKind,
@@ -23,10 +25,12 @@ import {
   type FigureContext,
   type OutlineContext,
   type PlanContext,
+  type VariantsContext,
 } from "../shared/actions.ts";
 import {
   appendCandidateClaims,
   applyClaimDecisions,
+  articlePreferences,
   checkDraft,
   ctaCommand,
   lexiconRules,
@@ -275,6 +279,80 @@ const reviewOutline: Handler<typeof reviewOutlineArgs, typeof reviewOutlineResul
 
 // ---------------------------------------------------------------------------
 
+const LEARN_HINT =
+  "先把修订和批注里能推广到别的块的写法（用词、句式、语气、节奏、人称、段落处理）归纳成 0–3 条偏好，逐条运行 learn 记下，并用一句话告诉用户记了什么；只对这一处成立的修改不记。";
+
+const reviewVariants: Handler<typeof reviewVariantsArgs, typeof reviewVariantsResult> = {
+  kind: "review_variants",
+  description:
+    "本篇还没选定笔调时，把同一块的 2–4 版（同样的主张、不同笔调）并排嵌入对话，让用户挑一版，并对各版写喜欢或不喜欢的地方。调用时不写文件；用户选定后，选中的正文以 draft 写入 blocks/<id>.md。起草门禁与 check-draft 相同。",
+  args: reviewVariantsArgs,
+  result: reviewVariantsResult,
+  prepare(input) {
+    const dir = resolveArticle(input.article);
+    const meta = requireArticle(dir);
+    const gate = checkDraft(dir, input.blockId);
+    if (gate) throw new UserFacingError(gate);
+    const ids = new Set(input.variants.map((v) => v.id));
+    if (ids.size !== input.variants.length) throw new UserFacingError("版本 id 不能重复。");
+    const section = sectionOfBlock(dir, input.blockId);
+    const claims = new Map(loadClaims(dir).map((c) => [c.id, c]));
+    const outlineIds = loadOutline(dir).sections.flatMap((s) => s.blockIds);
+    const prevId = outlineIds[outlineIds.indexOf(input.blockId) - 1];
+    const prev = prevId ? loadBlock(dir, prevId) : null;
+    const context: VariantsContext = {
+      sectionTitle: section?.title ?? null,
+      claims: (input.claimIds ?? section?.claimIds ?? []).map((id) => ({
+        id,
+        text: claims.get(id)?.text ?? "（主张缺失）",
+        status: claims.get(id)?.status ?? "missing",
+      })),
+      prev: prev?.exists ? { id: prev.id, body: prev.body } : null,
+      preferences: articlePreferences(dir),
+    };
+    return { title: `选笔调：${meta.title} · ${context.sectionTitle ?? ""} · ${input.blockId}`, article: dir, context };
+  },
+  submit(input, result) {
+    const dir = resolveArticle(input.article);
+    const cta = ctaCommand(dir);
+    const label = (id: string) => {
+      const v = input.variants.find((x) => x.id === id);
+      return v ? `${v.id}「${v.label}」` : id;
+    };
+    const feedback = result.feedback.filter((f) => f.text.trim()).map((f) => `- ${label(f.variantId)}：${f.text.trim()}`);
+    if (result.decision === "later") return lines(`用户暂时不选 ${input.blockId} 的版本，没有写入任何文件。`, note(result.note), ...feedback);
+    if (result.decision === "regenerate")
+      return lines(
+        `用户对 ${input.blockId} 的几版都不满意，没有写入任何文件。`,
+        feedback.length ? "用户对各版的评价：" : null,
+        ...feedback,
+        note(result.note),
+        `把评价里能推广的写法用 learn --source variant 记下，然后按评价换一组版本，再调用 review_variants。`,
+      );
+    const chosen = input.variants.find((v) => v.id === result.chosenId);
+    if (!chosen) throw new UserFacingError("选定时必须给出 chosenId。");
+    writeBlockDraft(dir, input.blockId, chosen.body, {
+      claimIds: input.claimIds,
+      figureIds: input.figureIds,
+      instruction: `用户从多版中选了 ${chosen.label}`,
+    });
+    const chosenFeedback = result.feedback.find((f) => f.variantId === chosen.id)?.text.trim();
+    const voiceNote = [chosen.voice === "custom" ? chosen.summary ?? chosen.label : null, chosenFeedback, result.note?.trim()].filter(Boolean).join("；");
+    return lines(
+      `用户选了 ${label(chosen.id)}（笔调 ${chosen.voice}），正文已以 draft 写入 blocks/${input.blockId}.md。`,
+      feedback.length ? "用户对各版的评价（没选中的版本也说明了偏好）：" : null,
+      ...feedback,
+      note(result.note),
+      "下一步：",
+      `${cta} pick-variant --article ${q(dir)} --block ${input.blockId} --voice ${chosen.voice}${voiceNote ? ` --note ${q(voiceNote)}` : ""}`,
+      `然后把评价里能推广的写法逐条用 ${cta} learn --article ${q(dir)} --block ${input.blockId} --source variant --text "…" 记下，`,
+      "再调用 review_block 把选中的这版交给用户精修（body 用选中的正文，按刚记下的偏好先调好）。",
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+
 function describeChanges(result: z.infer<typeof reviewBlockResult>): string[] {
   return result.changes.map((c) => {
     const where = c.context ? `（${c.context}）` : "";
@@ -322,8 +400,11 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
       prev: neighbor(idx - 1),
       next: neighbor(idx + 1),
       rules: lexiconRules(dir),
-      styleRules: (profile?.rules ?? []).filter((r) => r.status === "active").map((r) => ({ id: r.id, text: r.text, strength: r.strength })),
-      paragraph: profile?.paragraph ?? null,
+      styleRules: [
+        ...articlePreferences(dir).map((p) => ({ id: p.id, text: p.text, strength: "本篇" })),
+        ...(profile?.rules ?? []).filter((r) => r.status === "active").map((r) => ({ id: r.id, text: r.text, strength: r.strength })),
+      ],
+      paragraph: null,
       styleRevision: meta.styleRevision ?? null,
     };
     return { title: `${meta.title} · ${context.sectionTitle ?? ""} · ${input.blockId}`, article: dir, context };
@@ -350,6 +431,8 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
         ...comments,
         note(result.note),
         `下一步：${cta} accept-block --article ${q(dir)} --block ${input.blockId}`,
+        (changes.length || comments.length || result.note?.trim()) &&
+          `写下一块之前，${LEARN_HINT}命令：${cta} learn --article ${q(dir)} --block ${input.blockId} --source edit --text "…" --evidence "改前 → 改后"`,
         "然后只把下一块交给用户看。",
       );
     return lines(
@@ -359,9 +442,11 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
       comments.length ? "批注：" : null,
       ...comments,
       note(result.note),
+      LEARN_HINT,
+      `命令：${cta} learn --article ${q(dir)} --block ${input.blockId} --source annotation --text "…" --evidence "改前 → 改后"`,
       "当前正文：",
       result.finalBody.trim(),
-      "只改这一块，只用这块 claimIds 里已接受的主张；改完再调用 review_block（instruction 写明改了什么）。",
+      "只改这一块，只用这块 claimIds 里已接受的主张；改的时候也照刚记下的偏好调整整块，不只改批注指到的字。改完再调用 review_block（instruction 写明改了什么）。",
     );
   },
 };
@@ -453,6 +538,7 @@ export const HANDLERS: Record<ActionKind, Handler> = {
   review_writing_plan: reviewWritingPlan as unknown as Handler,
   review_claims: reviewClaims as unknown as Handler,
   review_outline: reviewOutline as unknown as Handler,
+  review_variants: reviewVariants as unknown as Handler,
   review_block: reviewBlock as unknown as Handler,
   review_figure: reviewFigure as unknown as Handler,
   review_style_candidates: reviewStyleCandidates as unknown as Handler,

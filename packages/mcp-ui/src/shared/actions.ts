@@ -10,6 +10,7 @@ export const ACTIONS = [
   "review_writing_plan",
   "review_claims",
   "review_outline",
+  "review_variants",
   "review_block",
   "review_figure",
   "review_style_candidates",
@@ -184,6 +185,36 @@ export const reviewOutlineResult = z.object({
 });
 export type ReviewOutlineResult = z.infer<typeof reviewOutlineResult>;
 
+// review_variants ---------------------------------------------------------------
+
+export const variantDraft = z.object({
+  id: z.string().min(1).describe("版本 id，例如 A、B、C"),
+  voice: z.string().min(1).describe("内置笔调 id（cta.py presets 列出）、profile（按作者的偏好写）或 custom"),
+  label: z.string().min(1).describe("给作者看的名字，例如「按你的偏好」「跟同事复盘」"),
+  summary: z.string().optional().describe("一句话说这版和其他版差在哪"),
+  body: z.string().min(1).describe("这一版的 Markdown 正文"),
+});
+export type VariantDraft = z.infer<typeof variantDraft>;
+
+export const reviewVariantsInput = {
+  article: articlePath,
+  blockId: z.string().min(1).describe("大纲里的块 id，例如 b001"),
+  variants: z.array(variantDraft).min(2).max(4).describe("同一块、同样主张、不同笔调的几版；有偏好材料时其中一版的 voice 为 profile"),
+  claimIds: z.array(z.string()).optional(),
+  figureIds: z.array(z.string()).optional(),
+  context: z.string().optional().describe("为什么出这几版，例如「还没选定笔调」"),
+};
+export const reviewVariantsArgs = z.object(reviewVariantsInput);
+export type ReviewVariantsInput = z.infer<typeof reviewVariantsArgs>;
+
+export const reviewVariantsResult = z.object({
+  decision: z.enum(["pick", "regenerate", "later"]),
+  chosenId: z.string().optional(),
+  feedback: z.array(z.object({ variantId: z.string(), text: z.string() })),
+  note: z.string().optional(),
+});
+export type ReviewVariantsResult = z.infer<typeof reviewVariantsResult>;
+
 // review_block ------------------------------------------------------------------
 
 export const reviewBlockInput = {
@@ -304,6 +335,13 @@ export interface BlockContext {
   styleRules: { id: string; text: string; strength: string }[];
   paragraph: { minChars?: number; maxChars?: number } | null;
   styleRevision: number | null;
+}
+
+export interface VariantsContext {
+  sectionTitle: string | null;
+  claims: { id: string; text: string; status: string }[];
+  prev: { id: string; body: string } | null;
+  preferences: { id: string; text: string }[];
 }
 
 export interface ClaimsContext {

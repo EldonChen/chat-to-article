@@ -69,6 +69,61 @@ test("review_block refuses to draft a block that is not in the outline", () => {
   assert.throws(() => manager.create("review_block", { ...input("review_block"), blockId: "b999" }), /b999/);
 });
 
+test("review_block shows article preferences and asks the agent to learn from the feedback", () => {
+  const { article, manager, input } = setup();
+  writeFileSync(
+    join(article, "preferences.jsonl"),
+    [
+      JSON.stringify({ id: "p1", text: "讲经过时用我的原话", kind: "rule", status: "active" }),
+      JSON.stringify({ id: "p2", text: "笔调用「工程笔记」", kind: "voice", status: "active" }),
+      JSON.stringify({ id: "p3", text: "已停用", kind: "rule", status: "retired" }),
+    ].join("\n") + "\n",
+  );
+  const session = manager.create("review_block", input("review_block"));
+  const context = session.prepared.context as { styleRules: { id: string }[]; paragraph: unknown };
+  assert.deepEqual(context.styleRules.map((r) => r.id), ["p1"]);
+  assert.equal(context.paragraph, null);
+  const out = manager.submit(session.id, { decision: "revise", finalBody: input("review_block").body, changes: [], comments: [{ id: "c", quote: "返工", text: "太书面" }] });
+  assert.ok(out.ok);
+  assert.match(out.response, /learn --article/);
+});
+
+test("review_variants writes only the chosen version and returns pick-variant", () => {
+  const { article, manager, input } = setup();
+  const file = join(article, "blocks", "b001.md");
+  const before = readFileSync(file, "utf8");
+  const session = manager.create("review_variants", input("review_variants"));
+  assert.equal(readFileSync(file, "utf8"), before, "calling the tool writes nothing");
+  const out = manager.submit(session.id, {
+    decision: "pick",
+    chosenId: "B",
+    feedback: [
+      { variantId: "B", text: "像我说话" },
+      { variantId: "C", text: "太冷" },
+    ],
+  });
+  assert.ok(out.ok);
+  const saved = parseBlock(readFileSync(file, "utf8"));
+  assert.match(saved.body, /说实话/);
+  assert.equal(saved.meta.status, "draft");
+  assert.match(out.response, /pick-variant .* --block b001 --voice colleague --note "像我说话"/);
+  assert.match(out.response, /C「工程笔记」：太冷/);
+  assert.match(out.response, /review_block/);
+});
+
+test("review_variants regenerate writes nothing and pick without a choice is rejected", () => {
+  const { article, manager, input } = setup();
+  const file = join(article, "blocks", "b001.md");
+  const before = readFileSync(file, "utf8");
+  const missing = manager.create("review_variants", input("review_variants"));
+  assert.equal(manager.submit(missing.id, { decision: "pick", feedback: [] }).ok, false);
+  assert.equal(missing.status, "pending");
+  const out = manager.submit(missing.id, { decision: "regenerate", feedback: [{ variantId: "A", text: "都太长" }] });
+  assert.ok(out.ok);
+  assert.match(out.response, /review_variants/);
+  assert.equal(readFileSync(file, "utf8"), before);
+});
+
 test("invalid submissions are rejected without changing the session", () => {
   const { manager, input } = setup();
   const session = manager.create("review_outline", input("review_outline"));
@@ -183,6 +238,7 @@ test("action tools link to ui:// views, app-only tools are marked, and views are
       "review_outline",
       "review_style_candidates",
       "review_submit",
+      "review_variants",
       "review_writing_plan",
     ]);
     assert.equal(meta("review_block")?.resourceUri, VIEW_URIS.review);

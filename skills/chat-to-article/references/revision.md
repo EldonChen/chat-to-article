@@ -15,6 +15,8 @@ python3 <skill>/scripts/cta.py lint --article articles/<slug> --block b003
 
 把统一差异给用户。用户接受后再 `accept-block`。`rewrite-block` 只写这一个块文件和 `revisions.jsonl`。
 
+用户的修改意见里只要有能推广到别的块的写法，改之前先按 [preferences.md](preferences.md) 用 `learn` 记下，这样下一块不会再犯同样的问题。
+
 词表命中时，只替换 `sentence` 字段那一句。`start` 和 `end` 是这块正文里的位置。
 
 ## 主张变了

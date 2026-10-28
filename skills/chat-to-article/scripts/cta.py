@@ -152,7 +152,39 @@ def cmd_observe(args) -> int:
 
 
 def cmd_bump(args) -> int:
-    code, message = cta_lib.bump_style(_voice(args), args.rule)
+    article = Path(args.article) if args.article else None
+    code, message = cta_lib.bump_style(_voice(args), args.rule, article, args.pref)
+    sys.stdout.write(message)
+    return code
+
+
+def cmd_presets(_args) -> int:
+    sys.stdout.write(cta_lib.format_presets())
+    return 0
+
+
+def cmd_variant_brief(args) -> int:
+    sys.stdout.write(cta_lib.variant_brief(_article(args), _voice(args), args.block))
+    return 0
+
+
+def cmd_pick_variant(args) -> int:
+    body = Path(args.body_file).read_text(encoding="utf-8") if args.body_file else None
+    code, message = cta_lib.pick_variant(_article(args), _voice(args), args.block, args.voice_id, body, args.note or "")
+    sys.stdout.write(message)
+    return code
+
+
+def cmd_learn(args) -> int:
+    code, message = cta_lib.learn_preference(
+        _article(args), _voice(args), args.text, args.evidence or "", args.block or "", args.source
+    )
+    sys.stdout.write(message)
+    return code
+
+
+def cmd_forget(args) -> int:
+    code, message = cta_lib.forget_preference(_article(args), args.id)
     sys.stdout.write(message)
     return code
 
@@ -211,6 +243,10 @@ def cmd_demo(_args) -> int:
     if code != 0:
         return code
     code, message = cta_lib.set_gate(article, None, True, None)
+    sys.stdout.write(message)
+    if code != 0:
+        return code
+    code, message = cta_lib.set_gate(article, None, None, True)
     sys.stdout.write(message)
     if code != 0:
         return code
@@ -341,7 +377,38 @@ def build_parser() -> argparse.ArgumentParser:
 
     bump = sub.add_parser("bump-style")
     bump.add_argument("--rule", required=True)
+    bump.add_argument("--article", help="规则来自这篇文章的偏好时，和 --pref 一起给出")
+    bump.add_argument("--pref", help="preferences.jsonl 里的偏好 id，写入后标为已写入")
     bump.set_defaults(func=cmd_bump)
+
+    presets = sub.add_parser("presets", help="列出内置笔调和样稿")
+    presets.set_defaults(func=cmd_presets)
+
+    brief = sub.add_parser("variant-brief", help="这块出几版、能不能出「按你的偏好」那一版")
+    brief.add_argument("--article", required=True)
+    brief.add_argument("--block", required=True)
+    brief.set_defaults(func=cmd_variant_brief)
+
+    pick = sub.add_parser("pick-variant", help="记下作者选中的版本和本篇笔调")
+    pick.add_argument("--article", required=True)
+    pick.add_argument("--block", required=True)
+    pick.add_argument("--voice", dest="voice_id", required=True, help="内置笔调 id、profile 或 custom")
+    pick.add_argument("--body-file", help="选中的正文；不给时沿用块文件里已有的正文")
+    pick.add_argument("--note", help="作者为什么选它，或 custom 笔调的描述")
+    pick.set_defaults(func=cmd_pick_variant)
+
+    learn = sub.add_parser("learn", help="把作者的一次反馈记成本篇偏好")
+    learn.add_argument("--article", required=True)
+    learn.add_argument("--text", required=True)
+    learn.add_argument("--evidence")
+    learn.add_argument("--block")
+    learn.add_argument("--source", choices=["annotation", "edit", "variant", "chat"], default="chat")
+    learn.set_defaults(func=cmd_learn)
+
+    forget = sub.add_parser("forget", help="停用一条本篇偏好")
+    forget.add_argument("--article", required=True)
+    forget.add_argument("--id", required=True)
+    forget.set_defaults(func=cmd_forget)
 
     private = sub.add_parser("private")
     private.add_argument("--action", choices=["ban", "prefer", "allow", "promote-pattern"], required=True)

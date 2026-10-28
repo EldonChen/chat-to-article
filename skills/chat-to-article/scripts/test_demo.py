@@ -43,6 +43,9 @@ def ready(root: Path) -> tuple[Path, Path]:
     code, message = cta_lib.set_gate(article, None, True, None)
     if code != 0:
         raise RuntimeError(message)
+    code, message = cta_lib.set_gate(article, None, None, True)
+    if code != 0:
+        raise RuntimeError(message)
     (article / "blocks").mkdir(exist_ok=True)
     for block_id in ("b001", "b002"):
         shutil.copyfile(FIXTURE / "blocks" / f"{block_id}.md", article / "blocks" / f"{block_id}.md")
@@ -388,6 +391,69 @@ class DemoTests(unittest.TestCase):
             code, message = cta_lib.compile_article(article, voice, True)
             self.assertEqual(code, 1)
             self.assertIn("未接受", message)
+
+    def test_learned_preference_reaches_the_next_block_without_bumping_style(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            article, voice = ready(Path(tmp))
+            code, _message = cta_lib.learn_preference(article, voice, "PREF_FROM_B001", "改前 → 改后", "b001", "annotation")
+            self.assertEqual(code, 0)
+            shown = cta_lib.show_block(article, voice, "b002")
+            self.assertIn("PREF_FROM_B001", shown)
+            self.assertEqual(cta_lib.load_meta(article)["styleRevision"], 1)
+            self.assertEqual(cta_lib.read_json(voice / "profile.json")["revision"], 1)
+            candidates = cta_lib.read_jsonl(voice / "candidates.jsonl")
+            self.assertEqual(candidates[-1]["text"], "PREF_FROM_B001")
+
+            cta_lib.forget_preference(article, "p1")
+            self.assertNotIn("PREF_FROM_B001", cta_lib.show_block(article, voice, "b002"))
+
+    def test_bump_style_marks_preference_promoted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            article, voice = ready(Path(tmp))
+            cta_lib.learn_preference(article, voice, "用我的原话", "", "b001", "edit")
+            code, message = cta_lib.bump_style(voice, "用我的原话", article, "p1")
+            self.assertEqual(code, 0, message)
+            self.assertTrue(cta_lib.load_preferences(article)[0]["promoted"])
+            self.assertEqual(cta_lib.read_jsonl(voice / "candidates.jsonl")[-1]["status"], "accepted")
+            self.assertEqual(cta_lib.unpromoted_preferences(article), [])
+
+    def test_pick_variant_sets_article_voice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            article, voice = ready(Path(tmp))
+            self.assertIn("还没选定", cta_lib.show_block(article, voice, "b001"))
+            brief = cta_lib.variant_brief(article, voice, "b001")
+            self.assertIn("按你的偏好", brief)
+            self.assertIn("段首先写具体问题", brief)
+            code, message = cta_lib.pick_variant(article, voice, "b001", "nope", None, "")
+            self.assertEqual(code, 1, message)
+            code, message = cta_lib.pick_variant(article, voice, "b001", "colleague", "选中的这一版正文。\n", "保留了原话")
+            self.assertEqual(code, 0, message)
+            self.assertEqual(cta_lib.load_plan(article)["voice"]["id"], "colleague")
+            meta, body = cta_lib.load_block(article, "b001")
+            self.assertEqual(meta["status"], "draft")
+            self.assertIn("选中的这一版", body)
+            shown = cta_lib.show_block(article, voice, "b002")
+            self.assertIn("跟同事复盘", shown)
+            self.assertIn("保留了原话", shown)
+            cta_lib.pick_variant(article, voice, "b001", "engineering", None, "")
+            voices = [row for row in cta_lib.load_preferences(article) if row["kind"] == "voice" and row["status"] == "active"]
+            self.assertEqual(len(voices), 1)
+            self.assertIn("工程笔记", voices[0]["text"])
+
+    def test_brief_without_preferences_offers_only_presets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            voice = root / "voice"
+            write_voice(voice, cta_lib.empty_profile(0))
+            article = root / "article"
+            cta_lib.new_article(article, "标题", "slug", "主题", voice)
+            cta_lib.write_json(article / "outline.json", {"sections": [{"id": "s1", "title": "一", "claimIds": [], "blockIds": ["b001"]}]})
+            brief = cta_lib.variant_brief(article, voice, "b001")
+            self.assertIn("3 版内置笔调", brief)
+            self.assertNotIn("「按你的偏好」那一版的材料", brief)
+
+    def test_default_profile_has_no_paragraph_limit(self):
+        self.assertNotIn("paragraph", cta_lib.empty_profile(0))
 
     def test_default_article_directory_and_demo_command(self):
         with tempfile.TemporaryDirectory() as tmp:
