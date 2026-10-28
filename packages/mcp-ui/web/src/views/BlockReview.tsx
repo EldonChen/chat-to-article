@@ -157,7 +157,7 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
       const hit = commentRanges(ed.state.doc).find((r) => r.from <= from && to <= r.to);
       if (hit) setActiveComment(hit.id);
     },
-  });
+  }, [session.id]);
 
   const doc = editor?.state.doc;
   const cards = useMemo(() => (doc ? changeCards(doc) : []), [doc]);

@@ -4,7 +4,8 @@ import { SKIP_META } from "./trackChanges.ts";
 
 export const CommentMark = Mark.create({
   name: "comment",
-  inclusive: false,
+  // 设为 inclusive 是为了不打断输入法；新输入的文字由修订插件去掉批注标记（见 trackChanges.ts）
+  inclusive: true,
   excludes: "",
   addAttributes() {
     return {

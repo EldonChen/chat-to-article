@@ -70,3 +70,9 @@ body {
   text-decoration: underline dotted #d97706;
   text-underline-offset: 5px;
 }
+::highlight(lint-ban) {
+  text-decoration: underline wavy #e11d48;
+}
+::highlight(lint-watch) {
+  text-decoration: underline dotted #d97706;
+}
