@@ -2,7 +2,7 @@
 /**
  * 清理本机与当前工作区中的 chat-to-article 用户数据：
  * 1. 个人声音目录：$CHAT_TO_ARTICLE_HOME、~/.chat-to-article、~/.chat-to-artical、.voice/
- * 2. 工作区用户文章与导出数据：articles/、exports/，以及除内置 demo 外的文章目录
+ * 2. 工作区用户文章：articles/，以及除内置 demo 外的文章目录
  * 3. 系统临时目录中的测试与预览残留：$TMPDIR/cta-mcp-*
  *
  * 用法：
@@ -117,11 +117,9 @@ function collectTargets() {
   add(path.join(homedir(), ".chat-to-artical"), "旧版声音目录 (~/.chat-to-artical)");
   add(path.join(repoRoot, ".voice"), "工作区声音目录 (.voice/)");
 
-  // 2. 工作区用户文章与导出数据
+  // 2. 工作区用户文章
   add(path.join(repoRoot, "articles"), "工作区文章目录 (articles/)");
   add(path.join(process.cwd(), "articles"), "当前目录文章 (articles/)");
-  add(path.join(repoRoot, "exports"), "导出的对话数据 (exports/)");
-  add(path.join(process.cwd(), "exports"), "当前目录导出数据 (exports/)");
 
   for (const dir of findWorkspaceUserArticles(repoRoot)) {
     add(dir, "工作区用户文章目录");
