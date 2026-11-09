@@ -80,7 +80,7 @@ export function createMcpServer(manager: SessionManager, options: McpOptions): M
     { name: "chat-to-article-mcp-ui", version: options.version },
     {
       instructions:
-        "聊出文章来（chat-to-article）的审阅界面（MCP Apps）。需要作者决定或审阅时，调用对应的 review_* / ask_questions 工具：工具会在对话里嵌入一个审阅界面并立即返回。请用户在界面里操作后结束本轮；用户点按钮后，结果会作为一条用户消息回到对话。不要再把 writing-plan.json、claims.jsonl、outline.json 或整块正文贴进对话让用户确认。门禁（set-gate、accept-block、compile）仍用 cta.py。",
+        "聊出文章来（chat-to-article）的交互式审阅组件（MCP Apps）。需要作者决定或审阅时，可按需调用对应的 review_* / ask_questions 工具：工具会在对话里嵌入一个审阅界面并立即返回。请用户在界面里操作后结束本轮；用户点按钮后，界面会自动将确认结果持久化到文章目录或声音目录，并将审阅反馈作为用户消息回到对话。",
     },
   );
 

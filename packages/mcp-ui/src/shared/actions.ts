@@ -67,6 +67,28 @@ export type AskQuestionsResult = z.infer<typeof askQuestionsResult>;
 
 // review_writing_plan -----------------------------------------------------------
 
+export const inquiryTurnSchema = z.object({
+  turn: z.number().describe("第几轮追问（从 1 开始）"),
+  question: z.string().describe("用户提出的追问或反问"),
+  intent: z
+    .enum(["trigger", "probe", "counter", "synthesis"])
+    .or(z.string())
+    .optional()
+    .describe("追问性质：trigger（初始困惑）、probe（深入追问）、counter（认知碰撞/反问）、synthesis（归纳收敛）"),
+  shift: z.string().optional().describe("这一问带来的认知推进或解开的卡点"),
+  sourceId: z.string().optional(),
+});
+export type InquiryTurnWire = z.infer<typeof inquiryTurnSchema>;
+
+export const writingMotivationFields = z.object({
+  initialConfusion: z.string().describe("困惑起点：作者最初卡在什么问题、痛点或直觉冲突上"),
+  inquiryJourney: z.array(inquiryTurnSchema).optional().describe("追问演进链：用户在对话中一步步追问的关键节点"),
+  ahaMoment: z.string().describe("核心顿悟：追问到最后真正想通的核心判断"),
+  knowledgeGaps: z.array(z.string()).optional().describe("待补认知缺口：聊天中跳过、尚未验证或缺少边界条件的地方"),
+  readerValue: z.string().optional().describe("读者共鸣价值：处于相似困惑起点的读者顺着这条路径读完能收获什么"),
+});
+export type WritingMotivationFields = z.infer<typeof writingMotivationFields>;
+
 export const writingPlanFields = z.object({
   genre: z.array(z.string()).describe("文体，可组合，例如 [\"工程实践文章\", \"解释性文章\"]"),
   audience: z.string(),
@@ -76,6 +98,7 @@ export const writingPlanFields = z.object({
     .describe("偏好轴：explanationPace、abstraction、stance、perspective、readerAssumption、structure、tone，值写倾向的一句话"),
   approach: z.string().describe("行文方案：推进逻辑，以及为什么适合这篇"),
   openQuestions: z.array(z.string()),
+  motivation: writingMotivationFields.optional().describe("从用户连续追问中提取的结构化写作动机与认知轨迹"),
 });
 export type WritingPlanFields = z.infer<typeof writingPlanFields>;
 
@@ -110,10 +133,19 @@ export const claimSource = z.object({
   note: z.string().optional(),
 });
 
+export const claimRoleEnum = z.enum(["friction", "insight", "evidence", "boundary"]);
+export type ClaimRoleKind = z.infer<typeof claimRoleEnum>;
+
 export const claimDraft = z.object({
   id: z.string().min(1),
   text: z.string().min(1),
   status: z.enum(["candidate", "accepted", "rejected", "disputed"]).optional(),
+  role: claimRoleEnum
+    .or(z.string())
+    .optional()
+    .describe("认知角色：friction（困惑/痛点）、insight（核心顿悟）、evidence（机制/证据）、boundary（适用边界）"),
+  inquiryTurn: z.number().optional().describe("源自用户第几轮追问"),
+  gapNote: z.string().optional().describe("待补证据或边界说明"),
   sources: z.array(claimSource).optional(),
   secret: z.boolean().optional().describe("原文疑似含密钥"),
 });
@@ -137,6 +169,9 @@ export const reviewClaimsResult = z.object({
       id: z.string(),
       text: z.string(),
       status: z.enum(["candidate", "accepted", "rejected", "disputed"]),
+      role: claimRoleEnum.or(z.string()).optional(),
+      inquiryTurn: z.number().optional(),
+      gapNote: z.string().optional(),
       sources: z.array(claimSource).optional(),
       secret: z.boolean().optional(),
       resolved: z.boolean().optional(),
@@ -156,7 +191,9 @@ export const sectionDraft = z.object({
   claimIds: z.array(z.string()),
   figureIds: z.array(z.string()).optional(),
   blockIds: z.array(z.string()).optional(),
-  summary: z.string().optional().describe("这一节打算写什么，只用于审阅，不写入 outline.json"),
+  summary: z.string().optional().describe("这一节打算写什么"),
+  readerQuestion: z.string().optional().describe("这一节回应读者心里的什么疑问"),
+  cognitiveRole: z.string().optional().describe("这一节在认知爬坡路径中的角色，例如「从痛点切入 → 建立核心洞察」"),
 });
 
 export const figureDraft = z.object({
@@ -328,34 +365,60 @@ export interface BlockContext {
   previousBody: string | null;
   status: string;
   sectionTitle: string | null;
-  claims: { id: string; text: string; status: string }[];
+  readerQuestion?: string | null;
+  cognitiveRole?: string | null;
+  claims: { id: string; text: string; status: string; role?: string; gapNote?: string }[];
   prev: { id: string; body: string } | null;
   next: { id: string; body: string } | null;
   rules: LexiconRuleWire[];
   styleRules: { id: string; text: string; strength: string }[];
   paragraph: { minChars?: number; maxChars?: number } | null;
   styleRevision: number | null;
+  motivation?: WritingMotivationFields | null;
 }
 
 export interface VariantsContext {
   sectionTitle: string | null;
-  claims: { id: string; text: string; status: string }[];
+  readerQuestion?: string | null;
+  claims: { id: string; text: string; status: string; role?: string }[];
   prev: { id: string; body: string } | null;
   preferences: { id: string; text: string }[];
+  motivation?: WritingMotivationFields | null;
 }
 
 export interface ClaimsContext {
-  existing: { id: string; text: string; status: string; sources?: { kind: string; id?: string; note?: string }[]; secret?: boolean; resolved?: boolean }[];
+  existing: {
+    id: string;
+    text: string;
+    status: string;
+    role?: string;
+    inquiryTurn?: number;
+    gapNote?: string;
+    sources?: { kind: string; id?: string; note?: string }[];
+    secret?: boolean;
+    resolved?: boolean;
+  }[];
   usedBy: Record<string, string[]>;
   materials: { selected?: string[]; fullText?: string[] } | null;
+  motivation?: WritingMotivationFields | null;
 }
 
 export interface OutlineContext {
-  claims: { id: string; text: string; status: string }[];
-  existing: { id: string; title: string; claimIds: string[]; figureIds: string[]; blockIds: string[] }[];
+  claims: { id: string; text: string; status: string; role?: string; inquiryTurn?: number; gapNote?: string }[];
+  existing: {
+    id: string;
+    title: string;
+    claimIds: string[];
+    figureIds: string[];
+    blockIds: string[];
+    summary?: string;
+    readerQuestion?: string;
+    cognitiveRole?: string;
+  }[];
   figures: { id: string; kind: string; caption?: string; status: string }[];
   blockStatus: Record<string, string>;
   confirmed: boolean;
+  motivation?: WritingMotivationFields | null;
 }
 
 export interface PlanContext {

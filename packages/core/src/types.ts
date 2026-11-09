@@ -14,6 +14,24 @@ export interface ArticleMeta {
   includeProvenance?: boolean;
 }
 
+export type InquiryIntent = "trigger" | "probe" | "counter" | "synthesis";
+
+export interface InquiryTurn {
+  turn: number;
+  question: string;
+  intent?: InquiryIntent | string;
+  shift?: string;
+  sourceId?: string;
+}
+
+export interface WritingMotivation {
+  initialConfusion: string;
+  inquiryJourney?: InquiryTurn[];
+  ahaMoment: string;
+  knowledgeGaps?: string[];
+  readerValue?: string;
+}
+
 export interface WritingPlan {
   status: "draft" | "confirmed" | string;
   genre: string[];
@@ -22,10 +40,12 @@ export interface WritingPlan {
   styleAxes: Record<string, string>;
   approach: string;
   openQuestions: string[];
+  motivation?: WritingMotivation;
   voice?: { id: string; name?: string; note?: string };
 }
 
 export type ClaimStatus = "candidate" | "accepted" | "rejected" | "disputed";
+export type ClaimRole = "friction" | "insight" | "evidence" | "boundary";
 
 export interface ClaimSource {
   kind: "conversation" | "file" | "paste" | string;
@@ -37,6 +57,9 @@ export interface Claim {
   id: string;
   text: string;
   status: ClaimStatus | string;
+  role?: ClaimRole | string;
+  inquiryTurn?: number;
+  gapNote?: string;
   sources?: ClaimSource[];
   secret?: boolean;
   resolved?: boolean;
@@ -48,6 +71,9 @@ export interface Section {
   claimIds: string[];
   figureIds: string[];
   blockIds: string[];
+  summary?: string;
+  readerQuestion?: string;
+  cognitiveRole?: string;
 }
 
 export interface Outline {

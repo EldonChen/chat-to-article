@@ -399,14 +399,25 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
 
           {tab === "basis" && (
             <div className="space-y-3 text-sm">
+              {(context.readerQuestion || context.cognitiveRole) && (
+                <section className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+                  <h4 className="mb-1 text-xs font-medium text-emerald-800 dark:text-emerald-300">本节认知任务</h4>
+                  {context.cognitiveRole && <div className="text-xs font-medium text-stone-700 dark:text-stone-200">{context.cognitiveRole}</div>}
+                  {context.readerQuestion && <div className="mt-1 text-xs text-stone-600 dark:text-stone-300">回应读者疑问：{context.readerQuestion}</div>}
+                </section>
+              )}
               <section className="rounded-lg border border-stone-200 bg-white p-3 dark:border-stone-700 dark:bg-stone-900">
                 <h4 className="mb-2 text-xs font-medium text-stone-500">这块只能使用的主张</h4>
                 <ul className="space-y-1.5">
                   {context.claims.map((c) => (
-                    <li key={c.id} className="flex gap-2">
-                      <span className="font-mono text-xs text-stone-400">{c.id}</span>
-                      <span className={clsx("flex-1", c.status !== "accepted" && "text-amber-700")}>{c.text}</span>
-                      {c.status !== "accepted" && <Badge tone="amber">{c.status}</Badge>}
+                    <li key={c.id} className="space-y-0.5">
+                      <div className="flex gap-2">
+                        <span className="font-mono text-xs text-stone-400">{c.id}</span>
+                        {c.role && <Badge tone="blue">{c.role}</Badge>}
+                        <span className={clsx("flex-1", c.status !== "accepted" && "text-amber-700")}>{c.text}</span>
+                        {c.status !== "accepted" && <Badge tone="amber">{c.status}</Badge>}
+                      </div>
+                      {c.gapNote && <div className="pl-6 text-xs text-amber-600">缺口提示：{c.gapNote}</div>}
                     </li>
                   ))}
                   {!context.claims.length && <li className="text-stone-400">没有列出主张</li>}

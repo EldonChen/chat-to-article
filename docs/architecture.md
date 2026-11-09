@@ -341,7 +341,7 @@ description: >-
 
 `SKILL.md` 只保留工作流、门禁和“默认只改当前块”。检索细节、词表格式、图路由、档案格式放进 `references/`。主文件控制在 500 行以内。
 
-确定性脚本在 `skills/chat-to-article/scripts/cta.py`，使用 Python 3 标准库。已覆盖：JSONL 抽出文本、按锚点同步、词表扫描、按大纲编译。起草逻辑不在脚本里。
+确定性脚本在 `skills/chat-to-article/scripts/cta.py`，使用 Python 3 标准库，仅保留纯机械的四个辅助命令：`extract`（JSONL 抽出文本与密钥扫描）、`lint`（词表正则扫描）、`compile`（按大纲编译与导出守卫校验）、`sync-anchors`（按锚点双向同步）。主流程推进、追问动机提取、风格归纳与文稿起草改写均由 Agent 自主完成，不在脚本中做程序化状态机控制。
 
 ## 失败时的行为
 

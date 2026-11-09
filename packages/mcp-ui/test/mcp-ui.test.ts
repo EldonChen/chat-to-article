@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -14,8 +14,22 @@ import { createDemoArticle, demoInputs } from "../src/server/demo.ts";
 import { createMcpServer, VIEW_URIS } from "../src/server/mcp.ts";
 import { SessionManager } from "../src/server/sessions.ts";
 
+const tempDirs: string[] = [];
+process.on("exit", () => {
+  for (const dir of tempDirs) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  }
+});
+
 function setup() {
-  const article = createDemoArticle(mkdtempSync(join(tmpdir(), "cta-mcp-test-")));
+  const root = mkdtempSync(join(tmpdir(), "cta-mcp-test-"));
+  tempDirs.push(root);
+  process.env.CHAT_TO_ARTICLE_HOME = join(root, "voice");
+  const article = createDemoArticle(root);
   const inputs = new Map(demoInputs(article));
   const manager = new SessionManager();
   const input = (kind: ActionKind) => structuredClone(inputs.get(kind)) as Record<string, unknown>;
@@ -55,13 +69,15 @@ test("review_block writes a draft on call and saves the user's tracked edits on 
   assert.equal(manager.submit(session.id, { decision: "accept", finalBody, changes: [], comments: [] }).ok, false, "second submit is rejected");
 });
 
-test("review_block accept returns the accept-block command", () => {
-  const { manager, input } = setup();
+test("review_block accept directly marks the block as accepted on disk", () => {
+  const { article, manager, input } = setup();
   const session = manager.create("review_block", input("review_block"));
   const body = (input("review_block").body as string).replace("值得注意的是，", "");
   const out = manager.submit(session.id, { decision: "accept", finalBody: body, changes: [], comments: [] });
   assert.ok(out.ok);
-  assert.match(out.response, /accept-block --article .* --block b001/);
+  assert.match(out.response, /accepted/);
+  const saved = parseBlock(readFileSync(join(article, "blocks", "b001.md"), "utf8"));
+  assert.equal(saved.meta.status, "accepted");
 });
 
 test("review_block refuses to draft a block that is not in the outline", () => {
@@ -69,7 +85,7 @@ test("review_block refuses to draft a block that is not in the outline", () => {
   assert.throws(() => manager.create("review_block", { ...input("review_block"), blockId: "b999" }), /b999/);
 });
 
-test("review_block shows article preferences and asks the agent to learn from the feedback", () => {
+test("review_block shows article preferences and asks the agent to record reusable preferences", () => {
   const { article, manager, input } = setup();
   writeFileSync(
     join(article, "preferences.jsonl"),
@@ -85,10 +101,10 @@ test("review_block shows article preferences and asks the agent to learn from th
   assert.equal(context.paragraph, null);
   const out = manager.submit(session.id, { decision: "revise", finalBody: input("review_block").body, changes: [], comments: [{ id: "c", quote: "返工", text: "太书面" }] });
   assert.ok(out.ok);
-  assert.match(out.response, /learn --article/);
+  assert.match(out.response, /preferences\.jsonl/);
 });
 
-test("review_variants writes only the chosen version and returns pick-variant", () => {
+test("review_variants writes only the chosen version and persists the selected voice", () => {
   const { article, manager, input } = setup();
   const file = join(article, "blocks", "b001.md");
   const before = readFileSync(file, "utf8");
@@ -106,7 +122,9 @@ test("review_variants writes only the chosen version and returns pick-variant", 
   const saved = parseBlock(readFileSync(file, "utf8"));
   assert.match(saved.body, /说实话/);
   assert.equal(saved.meta.status, "draft");
-  assert.match(out.response, /pick-variant .* --block b001 --voice colleague --note "像我说话"/);
+  const plan = JSON.parse(readFileSync(join(article, "writing-plan.json"), "utf8")) as { voice?: { id: string; note?: string } };
+  assert.equal(plan.voice?.id, "colleague");
+  assert.equal(plan.voice?.note, "像我说话");
   assert.match(out.response, /C「工程笔记」：太冷/);
   assert.match(out.response, /review_block/);
 });
@@ -169,10 +187,10 @@ test("review_outline confirm writes outline.json and planned figures", () => {
   assert.ok(out.ok);
   const outline = JSON.parse(readFileSync(join(article, "outline.json"), "utf8")) as { sections: { title: string }[] };
   assert.equal(outline.sections[0].title, "改过的标题");
-  assert.match(out.response, /set-gate/);
+  assert.match(out.response, /outline\.json/);
 });
 
-test("review_writing_plan confirm creates the plan only after confirmation", () => {
+test("review_writing_plan confirm creates the plan and meta.json only after confirmation and persists structured motivation", () => {
   const { manager, input } = setup();
   const raw = input("review_writing_plan");
   const target = raw.article as string;
@@ -180,10 +198,55 @@ test("review_writing_plan confirm creates the plan only after confirmation", () 
   assert.equal(existsSync(join(target, "writing-plan.json")), false);
   const out = manager.submit(session.id, { decision: "confirm", plan: raw.plan, comments: [] });
   assert.ok(out.ok);
-  const plan = JSON.parse(readFileSync(join(target, "writing-plan.json"), "utf8")) as { status: string; audience: string };
-  assert.equal(plan.status, "draft");
+  const plan = JSON.parse(readFileSync(join(target, "writing-plan.json"), "utf8")) as {
+    status: string;
+    audience: string;
+    motivation?: { initialConfusion: string; inquiryJourney: { turn: number }[]; ahaMoment: string };
+  };
+  assert.equal(plan.status, "confirmed");
   assert.equal(plan.audience, (raw.plan as { audience: string }).audience);
-  assert.match(out.response, /new-article/);
+  assert.ok(plan.motivation?.initialConfusion.includes("语气还是会漂"));
+  assert.equal(plan.motivation?.inquiryJourney.length, 2);
+  assert.ok(plan.motivation?.ahaMoment.includes("双层机制"));
+  const meta = JSON.parse(readFileSync(join(target, "meta.json"), "utf8")) as { writingPlanConfirmed: boolean; slug: string };
+  assert.equal(meta.writingPlanConfirmed, true);
+  assert.equal(meta.slug, "style-learning");
+});
+
+test("review_claims and review_outline persist cognitive roles, inquiry turns, and reader questions", () => {
+  const { article, manager, input } = setup();
+  const claimsSession = manager.create("review_claims", input("review_claims"));
+  const claimsCtx = claimsSession.prepared.context as { motivation?: { ahaMoment: string } };
+  assert.ok(claimsCtx.motivation?.ahaMoment.includes("解耦"));
+
+  const claimsOut = manager.submit(claimsSession.id, {
+    decision: "submit",
+    claims: [
+      { id: "c3", text: "审阅时只给前后两块的只读正文，用来接上语气。", status: "accepted", role: "evidence", inquiryTurn: 1, gapNote: "补充越界拦截说明" },
+      { id: "c4", text: "用户要求整篇重写时，必须再确认一次。", status: "accepted", role: "boundary", inquiryTurn: 2 },
+      { id: "c5", text: "调试时用的密钥不进正文。", status: "rejected", role: "boundary", secret: true, resolved: true },
+    ],
+  });
+  assert.ok(claimsOut.ok);
+  const savedClaims = readJsonl(join(article, "claims.jsonl"));
+  const c3 = savedClaims.find((c) => c.id === "c3")!;
+  assert.equal(c3.role, "evidence");
+  assert.equal(c3.inquiryTurn, 1);
+  assert.equal(c3.gapNote, "补充越界拦截说明");
+
+  const outlineRaw = input("review_outline");
+  const outlineSession = manager.create("review_outline", outlineRaw);
+  const outlineOut = manager.submit(outlineSession.id, {
+    decision: "confirm",
+    sections: outlineRaw.sections,
+    comments: [],
+  });
+  assert.ok(outlineOut.ok);
+  const savedOutline = JSON.parse(readFileSync(join(article, "outline.json"), "utf8")) as {
+    sections: { id: string; readerQuestion?: string; cognitiveRole?: string }[];
+  };
+  assert.ok(savedOutline.sections[0]?.readerQuestion?.includes("重写"));
+  assert.ok(savedOutline.sections[0]?.cognitiveRole?.includes("引发共鸣"));
 });
 
 test("review_figure writes the source on call and records the decision", () => {
@@ -205,6 +268,7 @@ type ToolResult = { content: { type: string; text: string }[]; structuredContent
 
 function viewsDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "cta-mcp-views-"));
+  tempDirs.push(dir);
   writeFileSync(join(dir, "review.html"), "<!doctype html><title>review</title>");
   writeFileSync(join(dir, "figure.html"), "<!doctype html><title>figure</title>");
   return dir;
@@ -279,7 +343,7 @@ test("a tool call returns at once; the view loads the session, submits, and the 
       result: { decision: "submit", selected: [{ id: "cand-1", text: "段首先写具体问题" }], rejected: ["cand-2"] },
     });
     assert.notEqual(submitted.isError, true);
-    assert.match(submitted.content[0].text, /bump-style/);
+    assert.match(submitted.content[0].text, /个人声音目录/);
     assert.equal((submitted.structuredContent as { decision: string }).decision, "submit");
 
     const again = await call("review_submit", { sessionId, result: { decision: "later" } });
@@ -289,7 +353,7 @@ test("a tool call returns at once; the view loads the session, submits, and the 
     assert.equal((reloaded.structuredContent as { status: string }).status, "submitted", "a re-rendered view sees the submitted state");
 
     const result = await call("get_review_result", { sessionId });
-    assert.match(result.content[0].text, /bump-style/);
+    assert.match(result.content[0].text, /个人声音目录/);
     assert.match(result.content[1].text, /"decision":"submit"/);
 
     const bad = await call("review_block", { ...input("review_block"), blockId: "b999" });

@@ -3,6 +3,8 @@
     {
       "id": "s1",
       "title": "为什么按块改",
+      "readerQuestion": "为什么只改一句话却会导致整篇文章被重写？怎样限制修改波及范围？",
+      "cognitiveRole": "从痛点切入 → 建立核心洞察",
       "claimIds": ["c1"],
       "figureIds": [],
       "blockIds": ["b001"]
@@ -10,6 +12,8 @@
     {
       "id": "s2",
       "title": "图放在哪",
+      "readerQuestion": "文章里的流程图和架构图怎么存，才能既方便后续修改又能直接分享？",
+      "cognitiveRole": "补充机制证据 → 落地完整工作流",
       "claimIds": ["c2"],
       "figureIds": ["fig-flow"],
       "blockIds": ["b002"]

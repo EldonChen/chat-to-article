@@ -33,6 +33,12 @@ export function VariantsView({ session, submit }: { session: SessionDetail<Revie
           同一块内容写了 {input.variants.length} 种笔调，挑一版最像你的。喜欢或不喜欢哪里都可以写在下面，没选中的那几版也算，agent 会把这些记成你的写作偏好，后面的块照着写。
         </p>
         {input.context && <p className="text-xs text-stone-500">{input.context}</p>}
+        {context.readerQuestion && (
+          <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+            <span className="font-semibold">本节回应读者疑问：</span>
+            {context.readerQuestion}
+          </div>
+        )}
         {context.preferences.length > 0 && (
           <div className="rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500 dark:bg-stone-800/60 dark:text-stone-400">
             本篇已记下的偏好：{context.preferences.map((p) => p.text).join("；")}

@@ -111,7 +111,15 @@ export function ReaderTab({ article }: { article: ArticleDetail }) {
         <div className="space-y-10">
           {article.outline.sections.map((section) => (
             <section key={section.id} id={`section-${section.id}`}>
-              <h2 className="mb-4 pl-[5.5rem] text-lg font-semibold text-stone-800 dark:text-stone-100">{section.title}</h2>
+              <div className="mb-4 pl-[5.5rem]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">{section.title}</h2>
+                  {section.cognitiveRole && <Tag>{section.cognitiveRole}</Tag>}
+                </div>
+                {readerShowMeta && section.readerQuestion && (
+                  <p className="mt-1 text-xs text-stone-500">回应读者疑问：{section.readerQuestion}</p>
+                )}
+              </div>
               <div className="space-y-4">
                 {section.blockIds
                   .map((id) => blocks.get(id))
@@ -177,38 +185,100 @@ const AXIS_LABELS: Record<string, string> = {
   tone: "语气",
 };
 
+const INTENT_LABELS: Record<string, string> = {
+  trigger: "初始困惑",
+  probe: "深入追问",
+  counter: "认知碰撞",
+  synthesis: "归纳收敛",
+};
+
+const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
+  friction: { label: "困惑/痛点", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
+  insight: { label: "核心顿悟", cls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
+  evidence: { label: "机制/证据", cls: "bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300" },
+  boundary: { label: "适用边界", cls: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" },
+};
+
 export function PlanTab({ article }: { article: ArticleDetail }) {
   const plan = article.plan;
   if (!plan) return <Empty title="没有 writing-plan.json">这篇文章还没有记录写作计划。</Empty>;
+  const mot = plan.motivation;
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      <Card title="文章契约" actions={<StatusBadge status={plan.status} label={plan.status === "confirmed" ? "已确认" : "草稿"} />}>
-        <KV
-          items={[
-            ["文体", plan.genre?.length ? <div className="flex flex-wrap gap-1">{plan.genre.map((g) => <Tag key={g}>{g}</Tag>)}</div> : null],
-            ["读者", plan.audience || null],
-            ["目的", plan.purpose || null],
-            ["行文方案", plan.approach || null],
-          ]}
-        />
-      </Card>
-      <Card title="写作偏好">
-        {Object.keys(plan.styleAxes ?? {}).length ? (
-          <KV items={Object.entries(plan.styleAxes).map(([k, v]) => [AXIS_LABELS[k] ?? k, v] as [string, string])} />
-        ) : (
-          <p className="text-sm text-stone-400">没有记录偏好维度。</p>
-        )}
-        {!!plan.openQuestions?.length && (
-          <div className="mt-4 border-t border-stone-100 pt-3 dark:border-stone-800">
-            <div className="mb-2 text-xs font-medium text-stone-500">待定问题</div>
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {plan.openQuestions.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
+    <div className="space-y-6">
+      {mot && (mot.initialConfusion || mot.ahaMoment || (mot.inquiryJourney?.length ?? 0) > 0) && (
+        <Card title="写作动机与追问认知轨迹（从对话提取）">
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-lg border border-amber-200/80 bg-amber-50/40 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/20">
+              <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">1. 困惑起点（Initial Confusion）</div>
+              <p className="mt-1.5 text-sm leading-relaxed text-stone-700 dark:text-stone-200">{mot.initialConfusion || "—"}</p>
+            </div>
+            <div className="rounded-lg border border-stone-200 bg-stone-50/60 p-3.5 dark:border-stone-800 dark:bg-stone-800/40">
+              <div className="text-xs font-semibold text-stone-700 dark:text-stone-200">
+                2. 追问演进链（{mot.inquiryJourney?.length ?? 0} 轮追问）
+              </div>
+              {mot.inquiryJourney?.length ? (
+                <ol className="mt-2 space-y-2 text-xs">
+                  {mot.inquiryJourney.map((step) => (
+                    <li key={step.turn} className="border-l-2 border-indigo-300 pl-2.5 dark:border-indigo-700">
+                      <div className="font-medium text-stone-800 dark:text-stone-100">
+                        第 {step.turn} 问 [{INTENT_LABELS[step.intent ?? ""] ?? step.intent ?? "追问"}]：{step.question}
+                      </div>
+                      {step.shift && <div className="mt-0.5 text-stone-500 dark:text-stone-400">→ {step.shift}</div>}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-1.5 text-xs text-stone-400">未记录追问节点</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">3. 核心顿悟（Aha Moment）</div>
+              <p className="mt-1.5 text-sm leading-relaxed text-stone-700 dark:text-stone-200">{mot.ahaMoment || "—"}</p>
+              {mot.readerValue && (
+                <div className="mt-3 border-t border-emerald-200/60 pt-2 text-xs text-stone-600 dark:border-emerald-900/60 dark:text-stone-300">
+                  <span className="font-medium">读者共鸣：</span>
+                  {mot.readerValue}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </Card>
+          {!!mot.knowledgeGaps?.length && (
+            <div className="mt-4 rounded-lg border border-dashed border-stone-200 px-3.5 py-2.5 text-xs dark:border-stone-800">
+              <span className="font-semibold text-stone-600 dark:text-stone-300">待补认知缺口：</span>
+              <span className="text-stone-500">{mot.knowledgeGaps.join("；")}</span>
+            </div>
+          )}
+        </Card>
+      )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card title="文章契约" actions={<StatusBadge status={plan.status} label={plan.status === "confirmed" ? "已确认" : "草稿"} />}>
+          <KV
+            items={[
+              ["文体", plan.genre?.length ? <div className="flex flex-wrap gap-1">{plan.genre.map((g) => <Tag key={g}>{g}</Tag>)}</div> : null],
+              ["读者", plan.audience || null],
+              ["目的", plan.purpose || null],
+              ["行文方案", plan.approach || null],
+            ]}
+          />
+        </Card>
+        <Card title="写作偏好">
+          {Object.keys(plan.styleAxes ?? {}).length ? (
+            <KV items={Object.entries(plan.styleAxes).map(([k, v]) => [AXIS_LABELS[k] ?? k, v] as [string, string])} />
+          ) : (
+            <p className="text-sm text-stone-400">没有记录偏好维度。</p>
+          )}
+          {!!plan.openQuestions?.length && (
+            <div className="mt-4 border-t border-stone-100 pt-3 dark:border-stone-800">
+              <div className="mb-2 text-xs font-medium text-stone-500">待定问题</div>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {plan.openQuestions.map((q) => (
+                  <li key={q}>{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
@@ -251,7 +321,16 @@ export function ClaimsTab({ article }: { article: ArticleDetail }) {
             <div key={c.id} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-stone-800 dark:bg-stone-900">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 font-mono text-xs text-stone-400">{c.id}</span>
-                <p className={clsx("flex-1 text-sm leading-relaxed", c.status === "rejected" && "text-stone-400 line-through")}>{c.text}</p>
+                {c.role && ROLE_LABELS[c.role] && (
+                  <span className={clsx("mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium", ROLE_LABELS[c.role].cls)}>
+                    {ROLE_LABELS[c.role].label}
+                  </span>
+                )}
+                {c.inquiryTurn != null && <Tag>第 {c.inquiryTurn} 问</Tag>}
+                <div className="flex-1">
+                  <p className={clsx("text-sm leading-relaxed", c.status === "rejected" && "text-stone-400 line-through")}>{c.text}</p>
+                  {c.gapNote && <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">认知缺口：{c.gapNote}</p>}
+                </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {c.secret && (
                     <span className={clsx("inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs", c.resolved ? "bg-stone-100 text-stone-500 dark:bg-stone-800" : "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300")}>
@@ -291,13 +370,20 @@ export function OutlineTab({ article }: { article: ArticleDetail }) {
         <Card
           key={s.id}
           title={
-            <span className="flex items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               <span className="grid size-6 place-items-center rounded-full bg-indigo-50 text-xs text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{i + 1}</span>
               {s.title}
               <span className="font-mono text-xs font-normal text-stone-400">{s.id}</span>
+              {s.cognitiveRole && <Tag>{s.cognitiveRole}</Tag>}
             </span>
           }
         >
+          {s.readerQuestion && (
+            <div className="mb-3 rounded-lg bg-stone-50 px-3 py-1.5 text-xs text-stone-600 dark:bg-stone-800/60 dark:text-stone-300">
+              <span className="font-medium text-stone-500">回应读者疑问：</span>
+              {s.readerQuestion}
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <div className="mb-1.5 text-xs font-medium text-stone-500">主张</div>

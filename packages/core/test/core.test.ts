@@ -30,6 +30,10 @@ test("render parity with the Python compiler", () => {
   );
   assert.deepEqual(snapshot.exportErrors, []);
   assert.equal(snapshot.blocks.accepted, 2);
+  assert.ok(snapshot.plan?.motivation?.initialConfusion.includes("整篇重写"));
+  assert.equal(snapshot.plan?.motivation?.inquiryJourney?.length, 2);
+  assert.equal(snapshot.claimList.find((c) => c.id === "c1")?.role, "insight");
+  assert.ok(snapshot.outline.sections[0]?.readerQuestion?.includes("重写"));
 });
 
 test("article discovery finds the demo article", () => {

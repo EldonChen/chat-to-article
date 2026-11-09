@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""聊出文章来的确定性命令。起草和改写仍由 agent 完成。"""
+"""聊出文章来的机械辅助脚本（仅处理会话文本脱水、词表扫描、全文编译导出与块锚点同步）。
+
+主流程、写作动机提取、大纲规划、正文起草与修订均由 Agent 自主完成。
+"""
 
 from __future__ import annotations
 
@@ -23,10 +26,11 @@ def _article(args) -> Path:
 
 
 def cmd_extract(args) -> int:
-    complete, reason = cta_lib.validate_transcript_coverage(Path(args.jsonl), Path(args.coverage))
-    if not complete:
-        print(f"全文未核验：{reason}", file=sys.stderr)
-        return 2
+    if args.coverage:
+        complete, reason = cta_lib.validate_transcript_coverage(Path(args.jsonl), Path(args.coverage))
+        if not complete:
+            print(f"全文未核验：{reason}", file=sys.stderr)
+            return 2
     document, secrets = cta_lib.extract_jsonl(Path(args.jsonl))
     if args.out:
         Path(args.out).write_text(document, encoding="utf-8")
@@ -35,95 +39,10 @@ def cmd_extract(args) -> int:
     if args.secrets_out:
         cta_lib.write_json(Path(args.secrets_out), secrets)
     print(
-        f"覆盖已核验：{cta_lib.count_text_messages(Path(args.jsonl))} 条文本消息；疑似密钥 {len(secrets)} 处",
+        f"已抽出 {cta_lib.count_text_messages(Path(args.jsonl))} 条文本消息；疑似密钥 {len(secrets)} 处",
         file=sys.stderr,
     )
     return 0
-
-
-def cmd_check_materials(args) -> int:
-    hits_path = Path(args.hits).expanduser().resolve()
-    hits = cta_lib.read_json(hits_path)
-    for hit in hits:
-        for key in ("transcript", "coverage"):
-            value = hit.get(key)
-            if value and not Path(value).expanduser().is_absolute():
-                hit[key] = str((hits_path.parent / value).resolve())
-    selected = [item for item in args.selected.split(",") if item]
-    code, report = cta_lib.check_materials(hits, selected, args.supplement or [])
-    sys.stdout.write(report)
-    return code
-
-
-def cmd_check_sources(args) -> int:
-    article = _article(args)
-    errors = cta_lib.check_sources(
-        cta_lib.load_claims(article),
-        cta_lib.materials_selected(article),
-        cta_lib.materials_full_text(article),
-    )
-    if errors:
-        print("\n".join(errors))
-        return 1
-    print("来源都在勾选范围内。")
-    return 0
-
-
-def cmd_new_article(args) -> int:
-    directory = Path(args.dir) if args.dir else Path.cwd() / "articles" / args.slug
-    meta = cta_lib.new_article(directory, args.title, args.slug, args.topic, _voice(args))
-    print(f"文章目录：{directory}")
-    print(f"钉住的风格版本：{meta['styleRevision']}")
-    return 0
-
-
-def cmd_set_gate(args) -> int:
-    if not args.plan and not args.claims and not args.outline:
-        print("指定 --plan、--claims 或 --outline。")
-        return 1
-    code, message = cta_lib.set_gate(_article(args), args.plan or None, args.claims or None, args.outline or None)
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_check_draft(args) -> int:
-    code, message = cta_lib.check_draft(_article(args), args.section)
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_allow_write_all(args) -> int:
-    cta_lib.allow_write_all(_article(args))
-    print("已记下：作者要求按当前风格写完。")
-    return 0
-
-
-def cmd_show_block(args) -> int:
-    sys.stdout.write(cta_lib.show_block(_article(args), _voice(args), args.block))
-    return 0
-
-
-def cmd_rewrite_block(args) -> int:
-    body = Path(args.body_file).read_text(encoding="utf-8")
-    sys.stdout.write(cta_lib.rewrite_block(_article(args), args.block, body, args.instruction))
-    return 0
-
-
-def cmd_accept_block(args) -> int:
-    code, message = cta_lib.accept_block(_article(args), _voice(args), args.block)
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_mark_claim(args) -> int:
-    resolved = None
-    if args.resolved:
-        resolved = True
-    if args.unresolved:
-        resolved = False
-    code, message = cta_lib.mark_claim(_article(args), args.id, args.status, args.text, resolved)
-    sys.stdout.write(message)
-    return code
 
 
 def cmd_lint(args) -> int:
@@ -146,55 +65,6 @@ def cmd_sync(args) -> int:
     return code
 
 
-def cmd_observe(args) -> int:
-    sys.stdout.write(cta_lib.observe_style(_voice(args), [Path(item) for item in args.input]))
-    return 0
-
-
-def cmd_bump(args) -> int:
-    article = Path(args.article) if args.article else None
-    code, message = cta_lib.bump_style(_voice(args), args.rule, article, args.pref)
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_presets(_args) -> int:
-    sys.stdout.write(cta_lib.format_presets())
-    return 0
-
-
-def cmd_variant_brief(args) -> int:
-    sys.stdout.write(cta_lib.variant_brief(_article(args), _voice(args), args.block))
-    return 0
-
-
-def cmd_pick_variant(args) -> int:
-    body = Path(args.body_file).read_text(encoding="utf-8") if args.body_file else None
-    code, message = cta_lib.pick_variant(_article(args), _voice(args), args.block, args.voice_id, body, args.note or "")
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_learn(args) -> int:
-    code, message = cta_lib.learn_preference(
-        _article(args), _voice(args), args.text, args.evidence or "", args.block or "", args.source
-    )
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_forget(args) -> int:
-    code, message = cta_lib.forget_preference(_article(args), args.id)
-    sys.stdout.write(message)
-    return code
-
-
-def cmd_private(args) -> int:
-    cta_lib.apply_private(_voice(args), args.action, args.phrase or "", args.replacement or "", args.entry or "", args.pattern or "")
-    print("已写入私有词表。")
-    return 0
-
-
 def cmd_demo(_args) -> int:
     fixture = cta_lib.demo_root() / "fixture"
     voice = cta_lib.demo_root() / "voice"
@@ -213,67 +83,48 @@ def cmd_demo(_args) -> int:
     (voice / "candidates.jsonl").touch()
     cta_lib.snapshot_profile(voice, profile)
 
-    hits = cta_lib.read_json(fixture / "hits.json")
-    for hit in hits:
-        if hit.get("transcript"):
-            hit["transcript"] = str(fixture / hit["transcript"])
-        if hit.get("coverage"):
-            hit["coverage"] = str(fixture / hit["coverage"])
-    code, report = cta_lib.check_materials(hits, ["conv-full", "conv-summary"], [])
-    sys.stdout.write(report)
-    if code != 0:
-        return code
     _document, secrets = cta_lib.extract_jsonl(fixture / "transcript.jsonl")
     if not secrets:
         print("demo 失败：样例会话里的密钥没有被标出。")
         return 1
     print(f"全文已抽出，疑似密钥 {len(secrets)} 处。密钥留在抽取结果里，不进入正文。")
 
-    cta_lib.new_article(article, "按块修订", "block-revision", "块修订", voice)
-    shutil.copyfile(fixture / "writing-plan.json", article / "writing-plan.json")
-    shutil.copyfile(fixture / "claims.jsonl", article / "claims.jsonl")
-    shutil.copyfile(fixture / "outline.json", article / "outline.json")
-    shutil.copyfile(fixture / "materials.json", article / "materials.json")
+    article.mkdir(parents=True, exist_ok=True)
+    cta_lib.write_json(
+        article / "meta.json",
+        {
+            "title": "按块修订",
+            "slug": "block-revision",
+            "topic": "块修订",
+            "styleRevision": profile["revision"],
+            "locale": profile.get("locale") or "zh-CN",
+            "phase": "review",
+            "writingPlanConfirmed": True,
+            "claimsConfirmed": True,
+            "outlineConfirmed": True,
+            "writeAll": False,
+            "includeProvenance": False,
+        },
+    )
+    for name in ("writing-plan.json", "claims.jsonl", "outline.json", "materials.json"):
+        shutil.copyfile(fixture / name, article / name)
     figures = article / "figures"
     figures.mkdir(exist_ok=True)
     shutil.copyfile(fixture / "fig-flow.mmd", figures / "fig-flow.mmd")
     shutil.copyfile(fixture / "manifest.json", figures / "manifest.json")
-    code, message = cta_lib.set_gate(article, True, None, None)
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    code, message = cta_lib.set_gate(article, None, True, None)
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    code, message = cta_lib.set_gate(article, None, None, True)
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    code, message = cta_lib.check_draft(article, "first")
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    (article / "blocks").mkdir(exist_ok=True)
-    shutil.copyfile(fixture / "blocks" / "b001.md", article / "blocks" / "b001.md")
-    code, message = cta_lib.check_draft(article, "rest")
-    if code == 0:
-        print("demo 失败：第一节还没接受时，不应该写后面的节。")
-        return 1
-    sys.stdout.write(message)
-    code, message = cta_lib.accept_block(article, voice, "b001")
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    code, message = cta_lib.check_draft(article, "rest")
-    sys.stdout.write(message)
-    if code != 0:
-        return code
-    shutil.copyfile(fixture / "blocks" / "b002.md", article / "blocks" / "b002.md")
-    code, message = cta_lib.accept_block(article, voice, "b002")
-    sys.stdout.write(message)
-    if code != 0:
-        return code
+    blocks_dir = article / "blocks"
+    blocks_dir.mkdir(exist_ok=True)
+    for block_id in ("b001", "b002"):
+        meta, body = cta_lib.parse_block((fixture / "blocks" / f"{block_id}.md").read_text(encoding="utf-8"))
+        meta["status"] = "accepted"
+        cta_lib.save_block(article, meta, body)
+    cta_lib.write_jsonl(
+        article / "revisions.jsonl",
+        [
+            {"blockId": "b001", "instruction": "接受这块", "before": "改文章时，我最怕只想换掉一句话…", "afterStatus": "accepted"},
+            {"blockId": "b002", "instruction": "接受这块", "before": "结构图用 Mermaid 源文件放在 figures/…", "afterStatus": "accepted"},
+        ],
+    )
     code, message = cta_lib.compile_article(article, voice, True)
     sys.stdout.write(message)
     if code != 0:
@@ -287,138 +138,32 @@ def cmd_demo(_args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="聊出文章来")
+    parser = argparse.ArgumentParser(description="聊出文章来（机械辅助脚本）")
     parser.add_argument("--voice", help="声音目录，默认 $CHAT_TO_ARTICLE_HOME 或 ~/.chat-to-article")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    extract = sub.add_parser("extract")
+    extract = sub.add_parser("extract", help="从会话 JSONL 抽出纯文本并扫描疑似密钥")
     extract.add_argument("--jsonl", required=True)
-    extract.add_argument("--coverage", required=True, help="已核对分页和截断状态的 coverage.json")
+    extract.add_argument("--coverage", help="可选：核对分页和截断状态的 coverage.json")
     extract.add_argument("--out")
     extract.add_argument("--secrets-out")
     extract.set_defaults(func=cmd_extract)
 
-    materials = sub.add_parser("check-materials")
-    materials.add_argument("--hits", required=True)
-    materials.add_argument("--selected", default="")
-    materials.add_argument("--supplement", action="append")
-    materials.set_defaults(func=cmd_check_materials)
-
-    sources = sub.add_parser("check-sources")
-    sources.add_argument("--article", required=True)
-    sources.set_defaults(func=cmd_check_sources)
-
-    create = sub.add_parser("new-article")
-    create.add_argument("--dir")
-    create.add_argument("--title", required=True)
-    create.add_argument("--slug", required=True)
-    create.add_argument("--topic", required=True)
-    create.set_defaults(func=cmd_new_article)
-
-    gate = sub.add_parser("set-gate")
-    gate.add_argument("--article", required=True)
-    gate.add_argument("--claims", action="store_true")
-    gate.add_argument("--outline", action="store_true")
-    gate.add_argument("--plan", action="store_true")
-    gate.set_defaults(func=cmd_set_gate)
-
-    draft = sub.add_parser("check-draft")
-    draft.add_argument("--article", required=True)
-    draft.add_argument("--section", choices=["first", "rest"], required=True)
-    draft.set_defaults(func=cmd_check_draft)
-
-    write_all = sub.add_parser("allow-write-all")
-    write_all.add_argument("--article", required=True)
-    write_all.set_defaults(func=cmd_allow_write_all)
-
-    show = sub.add_parser("show-block")
-    show.add_argument("--article", required=True)
-    show.add_argument("--block", required=True)
-    show.set_defaults(func=cmd_show_block)
-
-    rewrite = sub.add_parser("rewrite-block")
-    rewrite.add_argument("--article", required=True)
-    rewrite.add_argument("--block", required=True)
-    rewrite.add_argument("--body-file", required=True)
-    rewrite.add_argument("--instruction", required=True)
-    rewrite.set_defaults(func=cmd_rewrite_block)
-
-    accept = sub.add_parser("accept-block")
-    accept.add_argument("--article", required=True)
-    accept.add_argument("--block", required=True)
-    accept.set_defaults(func=cmd_accept_block)
-
-    claim = sub.add_parser("mark-claim")
-    claim.add_argument("--article", required=True)
-    claim.add_argument("--id", required=True)
-    claim.add_argument("--status", choices=["candidate", "accepted", "rejected", "disputed"])
-    claim.add_argument("--text")
-    claim.add_argument("--resolved", action="store_true")
-    claim.add_argument("--unresolved", action="store_true")
-    claim.set_defaults(func=cmd_mark_claim)
-
-    lint = sub.add_parser("lint")
+    lint = sub.add_parser("lint", help="按共享与私有词表扫描禁用套话和观察句式")
     lint.add_argument("--article", required=True)
     lint.add_argument("--block")
     lint.set_defaults(func=cmd_lint)
 
-    compile_cmd = sub.add_parser("compile")
+    compile_cmd = sub.add_parser("compile", help="按大纲把块拼成工作稿 article.md 或干净的分享包 export/")
     compile_cmd.add_argument("--article", required=True)
     compile_cmd.add_argument("--export", action="store_true")
     compile_cmd.set_defaults(func=cmd_compile)
 
-    sync = sub.add_parser("sync-anchors")
+    sync = sub.add_parser("sync-anchors", help="把用户在 article.md 的修改按块锚点收回块文件")
     sync.add_argument("--article", required=True)
     sync.set_defaults(func=cmd_sync)
 
-    observe = sub.add_parser("observe-style")
-    observe.add_argument("--input", action="append", required=True)
-    observe.set_defaults(func=cmd_observe)
-
-    bump = sub.add_parser("bump-style")
-    bump.add_argument("--rule", required=True)
-    bump.add_argument("--article", help="规则来自这篇文章的偏好时，和 --pref 一起给出")
-    bump.add_argument("--pref", help="preferences.jsonl 里的偏好 id，写入后标为已写入")
-    bump.set_defaults(func=cmd_bump)
-
-    presets = sub.add_parser("presets", help="列出内置笔调和样稿")
-    presets.set_defaults(func=cmd_presets)
-
-    brief = sub.add_parser("variant-brief", help="这块出几版、能不能出「按你的偏好」那一版")
-    brief.add_argument("--article", required=True)
-    brief.add_argument("--block", required=True)
-    brief.set_defaults(func=cmd_variant_brief)
-
-    pick = sub.add_parser("pick-variant", help="记下作者选中的版本和本篇笔调")
-    pick.add_argument("--article", required=True)
-    pick.add_argument("--block", required=True)
-    pick.add_argument("--voice", dest="voice_id", required=True, help="内置笔调 id、profile 或 custom")
-    pick.add_argument("--body-file", help="选中的正文；不给时沿用块文件里已有的正文")
-    pick.add_argument("--note", help="作者为什么选它，或 custom 笔调的描述")
-    pick.set_defaults(func=cmd_pick_variant)
-
-    learn = sub.add_parser("learn", help="把作者的一次反馈记成本篇偏好")
-    learn.add_argument("--article", required=True)
-    learn.add_argument("--text", required=True)
-    learn.add_argument("--evidence")
-    learn.add_argument("--block")
-    learn.add_argument("--source", choices=["annotation", "edit", "variant", "chat"], default="chat")
-    learn.set_defaults(func=cmd_learn)
-
-    forget = sub.add_parser("forget", help="停用一条本篇偏好")
-    forget.add_argument("--article", required=True)
-    forget.add_argument("--id", required=True)
-    forget.set_defaults(func=cmd_forget)
-
-    private = sub.add_parser("private")
-    private.add_argument("--action", choices=["ban", "prefer", "allow", "promote-pattern"], required=True)
-    private.add_argument("--phrase")
-    private.add_argument("--replacement")
-    private.add_argument("--entry")
-    private.add_argument("--pattern")
-    private.set_defaults(func=cmd_private)
-
-    demo = sub.add_parser("demo")
+    demo = sub.add_parser("demo", help="生成样例文章与分享包")
     demo.set_defaults(func=cmd_demo)
     return parser
 

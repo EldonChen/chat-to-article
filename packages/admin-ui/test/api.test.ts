@@ -18,12 +18,22 @@ async function json<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-test("lists the demo article with gate counts", async () => {
+test("lists the demo article with gate counts and structured motivation in detail", async () => {
   const list = await json<{ id: string; relDir: string; hasExport: boolean; blocks: { accepted: number } }[]>("/api/articles");
   assert.equal(list.length, 1);
   assert.equal(list[0].relDir, "article");
   assert.equal(list[0].hasExport, true);
   assert.equal(list[0].blocks.accepted, 2);
+
+  const detail = await json<{
+    plan: { motivation?: { initialConfusion: string; inquiryJourney: unknown[]; ahaMoment: string } };
+    claimList: { id: string; role?: string }[];
+    outline: { sections: { id: string; readerQuestion?: string; cognitiveRole?: string }[] };
+  }>(`/api/articles/${list[0].id}`);
+  assert.ok(detail.plan.motivation?.initialConfusion.includes("整篇重写"));
+  assert.equal(detail.plan.motivation?.inquiryJourney.length, 2);
+  assert.equal(detail.claimList.find((c) => c.id === "c1")?.role, "insight");
+  assert.ok(detail.outline.sections[0]?.readerQuestion?.includes("重写"));
 });
 
 test("serves the share-package markdown as a download", async () => {

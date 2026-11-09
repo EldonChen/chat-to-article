@@ -2,9 +2,10 @@
 __pycache__/
 *.pyc
 
-# 若在本仓库里试跑，用户声音与文章工作区不入库
+# 若在本仓库里试跑，用户声音、文章工作区与导出数据不入库
 .voice/
 articles/
+exports/
 
 node_modules/
 dist/

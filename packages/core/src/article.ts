@@ -139,7 +139,7 @@ function figureErrors(dir: string, fig: Figure): string[] {
 /** cta_lib.export_errors 的只读移植，用于在界面上解释分享包为什么能或不能生成。 */
 export function exportErrors(
   dir: string,
-  meta: ArticleMeta,
+  _meta: ArticleMeta,
   claims: Claim[],
   outline: Outline,
   blocks: Block[],
@@ -148,8 +148,7 @@ export function exportErrors(
   materials: Materials | null,
 ): string[] {
   const errors: string[] = [];
-  if (!meta.writingPlanConfirmed) errors.push("写作计划还没确认。");
-  if (!meta.claimsConfirmed || !meta.outlineConfirmed) errors.push("主张或大纲还没确认。");
+  if (!outline.sections.length) errors.push("大纲是空的。");
   const claimMap = new Map(claims.map((c) => [c.id, c]));
   for (const claim of claims) {
     if (claim.secret && !claim.resolved) errors.push(`主张 ${claim.id} 标了密钥，作者还没处理。`);
@@ -165,8 +164,6 @@ export function exportErrors(
           errors.push(`主张 ${claim.id} 使用了只有摘要的会话 ${source.id}`);
       }
     }
-  } else {
-    errors.push("缺少 materials.json，无法核对会话是否勾选。");
   }
   const seenFigures = new Set<string>();
   for (const block of blocks) {

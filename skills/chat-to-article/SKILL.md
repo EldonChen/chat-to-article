@@ -2,155 +2,134 @@
 name: chat-to-article
 description: >-
   把某个主题下的过往聊天整理成可回顾、可共享的文章，并按块修订。
-  首块出多版让作者挑笔调，随批注即时沉淀偏好；维护版本化的个人写作风格、
+  从用户的追问轨迹中还原写作动机与认知路径，维护版本化的个人写作风格、
   共享与私有词表，以及 Mermaid、draw.io 和经确认的插图。
   在用户要把聊天整理成文章、从聊天写文章、按段改文章、回顾一个主题的对话，
   或修改文章中的某一段、某一张图时使用。
 ---
 
-# 聊出文章来
+# 聊出文章来（chat-to-article）
 
-显示名是「聊出文章来」。文章目录默认是当前工作区的 `articles/<slug>/`。声音目录是 `$CHAT_TO_ARTICLE_HOME`，未设置时为 `~/.chat-to-article/`。
+本 Skill 采用**声明式设计**：这里定义可用的上下文资源、目标产物的形态与核心约束，以及面向不同场景的推荐路径。你（Agent）根据用户的实际意图与材料成熟度自主规划步骤、直接读写产物文件或调用交互式 UI 组件，无需遵循僵化的程序化状态机。
 
-确定性操作用与本文件同级的脚本。先把 `<skill>` 换成包含本 `SKILL.md` 的目录：
+---
 
+## 核心理念：追问即认知，以写促学
+
+用户在聊天里的**主动追问过程**，本身就是他理解一个概念的认知过程。不要把聊天记录仅仅当成扁平的静态语料池去硬凑摘要，而要从用户的连续提问中感知他的认知爬坡轨迹：
+
+1. **困惑起点（`initialConfusion`）**：最初在什么具体场景、痛点或直觉冲突上卡住了？
+2. **追问演进链（`inquiryJourney`）**：哪几轮追问（「为什么不直接…」「可是如果…」）打破了原有直觉、把思考推向深处？
+3. **核心顿悟（`ahaMoment`）**：追问到最后真正想通的核心判断是什么？
+4. **待补认知缺口（`knowledgeGaps`）**：聊天中哪些地方只是聊爽了但还缺严谨证据、边界条件或反例？
+
+将这套**写作动机**融入成文过程：一方面借助写作的严密性帮助作者补齐聊天时跳过的缺口（加深作者自身的结构化认知）；另一方面顺着作者亲历的认知坡度组织章节（而非全知视角的教科书平铺），让处于相似困惑起点的读者自然读懂，形成正向飞轮。
+
+---
+
+## 一、可用资源（Resources）
+
+### 1. 对话与材料来源
+- 本地会话记录（JSONL）、导出的对话文件（如 `exports/<share-id>.json`）、用户指定的笔记文件或直接粘贴的文本。
+- 会话检索、分页完整性核对与文本抽取方式见 [sources.md](references/sources.md)。
+
+### 2. 个人声音目录（Voice Home）
+路径为 `$CHAT_TO_ARTICLE_HOME`，未设置时默认为 `~/.chat-to-article/`（与具体文章目录隔离，分享文章时不会泄露个人词表）：
+- `profile.json` 与 `history/r<N>.json`：版本化的个人风格档案与历史快照（见 [style.md](references/style.md)）。
+- `exemplars/`：作者认可的本人范文片段。
+- `lexicon/private.json`：个人禁用词、偏好替换词与放行词条（见 [lexicon.md](references/lexicon.md)）。
+- `candidates.jsonl`：从日常改稿中收集、待升级进全局档案的风格候选规则。
+
+### 3. 内置词表与笔调参考
+- `<skill>/lexicon/`：共享的中英文套话与观察句式词表（见 [lexicon.md](references/lexicon.md)）。
+- `<skill>/styles/presets.json`：内置笔调样稿，供作者尚未建立个人档案或想尝试不同文风时选配（见 [voices.md](references/voices.md)）。
+
+### 4. 可选的交互式 UI 组件（MCP Apps）
+当本轮工具清单中存在 `review_writing_plan`、`review_claims`、`review_outline`、`review_variants`、`review_block`、`review_figure`、`review_style_candidates`、`ask_questions` 时，可按需调用它们在对话内嵌入富交互审阅卡片（见 [review-ui.md](references/review-ui.md)）。
+- 这些组件用于提升交互体验（如一键推导行文方案、按认知角色分组勾选主张、类 Word 修订模式改字批注），**没有强制的前置调用顺序限制**。
+- 当环境没有这些工具时，直接在对话中与用户自然沟通并读写文件即可。
+
+### 5. 机械辅助脚本（`<skill>/scripts/cta.py`）
+脚本仅承担**纯机械的文本脱水、正则匹配与文件拼拆**，不控制主流程：
 ```bash
-python3 <skill>/scripts/cta.py <子命令>
-```
-
-你负责检索、主张、大纲、起草和改写。脚本负责切分、门禁、扫描、编译、同步和钉住风格版本。不要手写 `export/`，不要改未点名的块文件。
-
-样例：`python3 <skill>/scripts/cta.py demo`。结果写在本 skill 目录的 `examples/demo/article/export/`，安装之后这个相对位置不变。
-
-## 先选路径
-
-- 新主题成文 → 下面的清单
-- 改已有的一块或一张图 → [revision.md](references/revision.md)
-- 第一块出多版让作者挑笔调、避免机械腔、篇幅怎么定 → [voices.md](references/voices.md)
-- 作者的批注、修改和选择怎么沉淀成偏好 → [preferences.md](references/preferences.md)
-- 从旧文学习笔调、或确认风格候选 → [style.md](references/style.md)
-- 禁用词、习惯说法、放行 → [lexicon.md](references/lexicon.md)
-- 图的类型和文件 → [figures.md](references/figures.md)
-- 会话怎么找、怎么抽 → [sources.md](references/sources.md)
-- 开写前如何确定文体、读者、偏好和行文方案，以及如何问用户 → [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)
-- 工具清单里有 `review_block`、`review_claims` 等审阅工具 → [review-ui.md](references/review-ui.md)：计划、主张、大纲、块、图和风格候选都在对话里嵌入的界面上审，不在对话里贴 JSON
-
-用户说「整篇重写」时，先停。复述这将重写全部正文块，问「确认整篇重写吗？」。得到肯定后再逐块改。只说「改改」时，先问是改哪一块、改大纲，还是改主张。没有整篇重写的脚本。
-
-没有用户明确要求时，不调用生图，不新增 `kind` 为 `raster` 的图。
-
-## 写一篇
-
-复制这份清单。前一项没通过，不要做下一项。
-
-```
-- [ ] 写作计划确认
-- [ ] 材料覆盖
-- [ ] 主张确认
-- [ ] 大纲确认
-- [ ] 第一块出多版，作者选定笔调
-- [ ] 第一节审完，偏好问过是否写进风格档案
-- [ ] 其余节
-- [ ] 词表
-- [ ] 风格候选
-- [ ] 导出
-```
-
-### 写作计划
-
-开始新主题时，先在对话中按 [writing-plan.md](references/writing-plan.md) 确认文章类型、目标读者、写作目的、偏好维度和行文方案。不要把“科技 / 人文 / 小说”当成互斥的风格标签：文体可以组合，也可以用用户自己的描述。偏好维度是可调整的草图，不是人格测验。
-
-先检查用户是否已经在对话里给出这些答案；已明确的内容直接复述为计划，不重复盘问。仍有会改变文章方向的未知项时，按 [discovery-questions.md](references/discovery-questions.md) 一次问一个或少量选择题，给出推荐项、可自定义项和“暂不确定 / 由你建议”。
-
-**提问是流程门禁，不是可选的表达风格。** 发出方向性问题前，检查本轮实际可调用的工具清单。若有结构化提问工具，立即调用它；Codex 环境中若暴露 `request_user_input_async`，就用它提供选择项和自由输入兜底。不能因为普通消息也能写成选择题，就跳过可用工具。提问后停止所有依赖该答案的操作，等待用户回复；收到回复后再更新计划、摘要并确认。用户没有确认计划前，不创建文章目录、不登记计划、不抽取主张、不提纲、不起草。
-
-若当前工具清单没有结构化提问工具，才使用普通消息作为兼容路径，并明确给出推荐选项、字母/文本/自定义回答方式。不要仅凭文档提到某个工具就假定它存在，也不要把“我在普通消息里问了”记录成已调用提问工具。普通消息提问后同样必须停步等待，不能在同一轮代替用户确认。
-
-```bash
-# 用户确认计划后，才创建文章并写入 writing-plan.json：
-python3 <skill>/scripts/cta.py new-article --title "标题" --slug slug --topic "主题"
-# 然后设置写作计划门禁：
-python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --plan
-```
-
-把用户确认的方向写入文章目录 `writing-plan.json`。未指定 `--dir` 时，文章在 `./articles/<slug>/`。
-
-每次继续已有文章，先读 `meta.json`、`writing-plan.json`、`claims.jsonl`、`outline.json` 和块状态，告诉用户当前阶段、已完成事项、阻塞项及下一步的可选路径。不要从“上次生成了第一节”推断用户已接受它；以文件状态为准。状态交互模板见 `discovery-questions.md`。
-
-### 材料覆盖
-
-按 [sources.md](references/sources.md) 检索并写成 `hits.json`。用户直接引用并要求使用的聊天视为已选择；逐页读取，直到读取接口明确报告没有下一页，并检查每条消息是否被截断。只有完成覆盖核对后，才把记录登记为全文。导出文件也要和消息数核对。不要因为没有本地导出文件就把已读正文标成摘要，也不要因为拿到部分正文就标成全文。无法完整读取时说明覆盖范围，允许用户提供导出或补充文本。用户从检索结果中选择时再按选择登记。然后运行：
-
-```bash
-python3 <skill>/scripts/cta.py check-materials --hits hits.json --selected id1,id2 --supplement 补充.md
-```
-
-退出码 2：停止。向用户要文件或粘贴。不要创建文章，不要写主张。摘要只用来提醒「还有这段」，不能写成主张。
-
-### 主张和大纲
-
-```bash
+# 1. 将冗长的原始会话 JSONL 脱水为纯文本，并标出疑似密钥
 python3 <skill>/scripts/cta.py extract --jsonl 会话.jsonl --coverage coverage.json --out 抽取.md --secrets-out secrets.json
+
+# 2. 用共享+私有词表扫描正文中的禁用套话（ban）与观察句式（watch）
+python3 <skill>/scripts/cta.py lint --article articles/<slug> [--block b001]
+
+# 3. 按大纲将 blocks/*.md 编译为带锚点的工作稿 article.md，或通过导出守卫生成干净的分享包 export/
+python3 <skill>/scripts/cta.py compile --article articles/<slug> [--export]
+
+# 4. 当用户在 article.md 中直接改了文字时，按 <!-- block:id --> 锚点把改动拆回对应的 blocks/<id>.md
+python3 <skill>/scripts/cta.py sync-anchors --article articles/<slug>
 ```
 
-把勾选结果写入 `materials.json`：`selected` 是勾选的 id，`fullText` 只放有全文的 id。主张写入 `claims.jsonl`，来源 `kind` 用 `conversation`、`file` 或 `paste`。只有摘要的会话不能出现在来源里。疑似密钥记在主张上：`secret: true`，原文不要抄进正文。用户处理后再 `mark-claim --resolved`。
+---
 
-每条主张要用户接受或拒绝。还有 `candidate` 或 `disputed` 时，不要确认：
+## 二、产物形态与目标约束（Target State & Invariants）
 
-```bash
-python3 <skill>/scripts/cta.py check-sources --article articles/<slug>
-python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --claims
+一篇文章默认存放在 `articles/<slug>/`（或用户指定的目录）。你可以直接用文件工具读写这些文件，也可通过 MCP UI 组件在用户提交时自动落盘：
+
+```text
+articles/<slug>/
+  meta.json              # 文章元数据与钉住的 styleRevision
+  writing-plan.json      # 写作动机（motivation）、文体、读者、目的、偏好轴、行文方案
+  materials.json         # 已选会话与拥有完整正文的会话列表
+  claims.jsonl           # 主张账本（每行一条事实或判断，含认知角色、来源与缺口提示）
+  outline.json           # 章节结构（含每节回应的读者疑问、认知角色、关联主张、图位与块 id）
+  preferences.jsonl      # 本篇从作者反馈中即时学到的写法偏好
+  revisions.jsonl        # 块修订历史记录
+  blocks/
+    b001.md              # 块文件（YAML frontmatter + 正文，正文的唯一权威来源）
+  figures/
+    manifest.json        # 图记录清单（mermaid / drawio / svg-chart / raster / remote）
+    fig-flow.mmd         # 图源文件
+  article.md             # 带 <!-- block:id --> 锚点的工作稿（由 compile 生成）
+  export/                # 最终可分享给读者的干净产物包（由 compile --export 生成）
+    article.md
+    figures/
 ```
 
-大纲写入 `outline.json`，图记录写入 `figures/manifest.json`。块是一个意思完整的单元，不是一个段落：一节分几块、一块写几段，按主张和材料多少来定，不要在各节之间平均分配。用户确认结构之后：
+### 核心约束（Invariants）
+1. **真实材料与认知缺口显式化**：写进正文的主张必须来自经过核对的全文材料或用户补充材料（只有摘要的会话仅作线索提醒，不能脑补细节）。聊天中尚未验证的推断或缺失边界，记在 `writing-plan.json` 的 `knowledgeGaps` 或主张的 `gapNote` 中，在成文时显式补齐或限定边界。
+2. **事实、结构与正文按块解耦**：
+   - `blocks/<id>.md` 是正文的权威存储。
+   - **局部修改默认只动被点名的那一块**：起草或改写某块时，只读取该块的 `claimIds`、前一块与后一块的只读文本（用于衔接语气）以及当前生效的风格偏好，**不要把整篇 `article.md` 塞进上下文重写**。
+   - 除非作者明确要求「整篇重写」并二次确认，否则已接受的其他块保持原样（见 [revision.md](references/revision.md)）。
+3. **单篇风格稳定与即时偏好沉淀**：
+   - 每篇文章在 `meta.json` 中记录 `styleRevision`，篇内保持同一风格基线；全局 `profile.json` 升版只影响新文章。
+   - 作者在审阅某块时给出的改字、批注或选版评价，应即时归纳为可推广的具体写法记入 `preferences.jsonl`，让下一块立刻生效（见 [preferences.md](references/preferences.md)）。
+4. **图表与视觉边界**：
+   - 结构/流程优先用可 diff 的 Mermaid（`.mmd`）；需手调布局的用 draw.io（需导出 `.svg`）；数据图表用 SVG。
+   - **未经用户明确要求，不调用生图工具生成光栅插图（`raster`）**（见 [figures.md](references/figures.md)）。
+5. **干净的分享包（`export/`）**：
+   - 交付给读者的 `export/` 不含块锚点、不含会话 ID、不含未脱敏的密钥（`sk-...` 等），且所有被大纲引用的块和图均已就绪、无 `ban` 级禁用套话。
 
-```bash
-python3 <skill>/scripts/cta.py set-gate --article articles/<slug> --outline
-```
+---
 
-大纲未确认时不要写块。
+## 三、推荐路径（Recommended & Flexible Paths）
 
-### 起草
+以下路径是**弱约束的推荐实践**，请根据用户的指令和手头材料灵活裁剪、跳步或组合：
 
-写每一块之前运行 `show-block`。它只给出钉住的风格版本、生效规则、范文、本篇选定的笔调、本篇已记下的偏好、这块的主张，以及前后块的只读正文。不要另读整篇 `article.md` 来改写。
+### 路径 A：从追问对话整理新文章（以写促学完整路径）
+适合用户给了一段或多段探索性聊天，希望梳理成一篇有深度、好读的文章：
+1. **还原动机与写作计划**：阅读对话中的用户提问序列，提炼 `motivation`（困惑起点 → 追问演进链 → 核心顿悟 → 待补认知缺口 → 读者共鸣价值），结合文体、目标读者与行文方案形成 `writing-plan.json`（可调用 `review_writing_plan` 或对未知方向用 `ask_questions` 提问，详见 [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)）。
+2. **梳理认知链式主张**：从全文材料中抽取核心主张写入 `claims.jsonl`，按 `friction`（痛点/直觉冲突）、`insight`（核心顿悟）、`evidence`（机制/证据）、`boundary`（适用边界）归类并标出待补缺口，交作者审阅（可调用 `review_claims`）。
+3. **规划读者认知大纲**：将行文方案展开为 `outline.json`，为每节明确 `readerQuestion`（回应读者心里的什么疑问）与 `cognitiveRole`（认知推进角色），规划必要的图表（可调用 `review_outline`）。
+4. **首块校准笔调与分段起草**：若本篇尚未确定笔调，第一块可按 [voices.md](references/voices.md) 提供 2–3 版不同笔调供作者挑选（可调用 `review_variants`）；随后按块起草并审阅（可调用 `review_block`、`review_figure`），随作者反馈即时更新 `preferences.jsonl`。
+5. **词表检查、风格沉淀与导出**：运行 `cta.py lint` 修正命中的禁用套话单句，询问作者是否将本篇新学到的偏好写入全局风格档案（可调用 `review_style_candidates`），最后运行 `cta.py compile --article ... --export` 生成分享包。
 
-```bash
-python3 <skill>/scripts/cta.py check-draft --article articles/<slug> --section first
-python3 <skill>/scripts/cta.py show-block --article articles/<slug> --block b001
-```
+### 路径 B：材料与结构已成型，快速成稿
+适合用户已经给出了清晰的提纲、成熟观点或结构化笔记，希望快速成文：
+- 直接将用户给出的方向与论点整理写入 `writing-plan.json`、`claims.jsonl` 和 `outline.json`，跳过冗余盘问，直接进入按块起草与审阅。
 
-`show-block` 提示本篇还没选定笔调时，这块不要只写一版：按 [voices.md](references/voices.md) 运行 `variant-brief`，出 3 版让用户挑。有偏好材料时，其中一版必须按用户的偏好写。用户选定后运行 `pick-variant`。
+### 路径 C：局部修订已有文章（改一段 / 改一句话 / 重画一张图）
+适合文章已有初稿或成品，用户只想调整局部（详见 [revision.md](references/revision.md)）：
+- 若用户在外部编辑器里直接改了带锚点的 `article.md`，先运行 `cta.py sync-anchors --article ...` 将改动收回对应块。
+- 若用户点名改某一段或某句话，只读取目标块 `blocks/<id>.md`（及相邻块只读上下文），修改后写回或调用 `review_block` 让用户确认，最后重新 `compile`。
+- 若用户修改或推翻了某条主张，更新 `claims.jsonl` 并将引用该主张的块标为 `stale`，仅针对受影响的块复核重写。
 
-正文只使用这块 `claimIds` 里已经接受的主张。篇幅跟着内容走，不要为了字数增删内容，也不要把每段写成一样长；起草后按 [voices.md](references/voices.md) 的「机械腔从哪来」自查一遍。写完把文件存成 `blocks/<id>.md`，一次只给用户看这一块。
-
-**每次用户给了反馈，都先沉淀偏好，再动笔。** 批注、亲手改的字、选版本时的评价、对话里的指令，都按 [preferences.md](references/preferences.md) 归纳成能推广的写法，用 `learn` 记下。这样下一块的 `show-block` 就会带上它，不用等整篇结束：
-
-```bash
-python3 <skill>/scripts/cta.py learn --article articles/<slug> --block b001 --source annotation \
-  --text "讲经过时用我的原话" --evidence "改前 → 改后"
-```
-
-用户接受后：
-
-```bash
-python3 <skill>/scripts/cta.py accept-block --article articles/<slug> --block b001
-```
-
-第一节全部接受后，问用户是否把本篇记下的偏好写进风格档案（`accept-block` 会提示）。默认先完成第一节。`check-draft --section rest` 失败时，不要写后面的节。用户明确说「按当前风格写完」之后，才运行 `allow-write-all`，然后再写其余节。其余节仍然一块一块给用户看。
-
-### 改一块
-
-只改被点名的块。用 `rewrite-block`，或只编辑那一个块文件。然后把脚本打印的差异给用户，不要重印全篇。细节见 [revision.md](references/revision.md)。
-
-### 词表、风格、导出
-
-`lint` 退出码 1 表示有禁用说法。只重写命中的那一句，同块其余句子保持原样。见 [lexicon.md](references/lexicon.md)。
-
-一篇结束时，把还没写进档案的本篇偏好和其余措辞修改收成候选，问用户哪些写入声音目录。写入用 `bump-style`，来自本篇偏好的带上 `--article` 和 `--pref`。这个命令不修改已有文章的 `styleRevision`。
-
-```bash
-python3 <skill>/scripts/cta.py lint --article articles/<slug>
-python3 <skill>/scripts/cta.py compile --article articles/<slug> --export
-```
-
-导出失败时，把脚本输出告诉用户。`export/` 没有更新，不要把工作稿 `article.md` 当成分享包。分享包通过检查后，把 `export/` 的路径告诉用户。
+### 路径 D：学习与维护个人风格 / 词表
+- 当用户提供过往旧文希望学习笔调时，直接阅读旧文归纳其人称、句式节奏、段落组织、开头习惯与代表性范文片段，经用户确认后更新 `~/.chat-to-article/profile.json`（详见 [style.md](references/style.md)）。
+- 当用户指定禁用词或习惯用语时，直接更新 `~/.chat-to-article/lexicon/private.json`（详见 [lexicon.md](references/lexicon.md)）。

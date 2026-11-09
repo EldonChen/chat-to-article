@@ -8,5 +8,29 @@
     "abstraction": "用流程图和实例解释概念"
   },
   "approach": "从返工问题出发，说明按块修订和图资产管理，再给出工作流程。",
-  "openQuestions": []
+  "openQuestions": [],
+  "motivation": {
+    "initialConfusion": "改文章时只想换掉一句话，为什么每次交给模型都会把整篇重写？结构图又该怎么保存才方便后续修改？",
+    "inquiryJourney": [
+      {
+        "turn": 1,
+        "question": "我改文章时最烦的是，只想换一句，整篇都被重写。",
+        "intent": "trigger",
+        "shift": "正文按块独立存储，修订时只提交目标块，相邻前后块仅作只读上下文以衔接语气。",
+        "sourceId": "conv-full"
+      },
+      {
+        "turn": 2,
+        "question": "结构图我想以后还能改。另外密钥不要写进文章。",
+        "intent": "counter",
+        "shift": "流程与结构图用可 diff 的 Mermaid 源文件；手绘排版图用 draw.io 并导出 SVG；敏感密钥单独标记脱敏。",
+        "sourceId": "conv-full"
+      }
+    ],
+    "ahaMoment": "将事实主张、章节大纲与正文块解耦，配合可编辑图源文件，才能把每次修订严格收敛在单块范围内。",
+    "knowledgeGaps": [
+      "用户在编译后的 article.md 里直接改字时，如何通过锚点安全收回而不误伤其他块"
+    ],
+    "readerValue": "帮助同样苦恼于 AI 改稿「牵一发而动全身」的开发者，掌握按块隔离上下文与管理图资产的协作方法。"
+  }
 }
