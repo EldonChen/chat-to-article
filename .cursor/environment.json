@@ -1,0 +1,32 @@
+{
+  "$schema": "https://cursor.com/schemas/environment.schema.json",
+  "name": "chat-to-article",
+  "install": "corepack enable && pnpm install --frozen-lockfile && pnpm build && python3 skills/chat-to-article/scripts/cta.py demo",
+  "enable_testing": true,
+  "ports": [
+    {
+      "name": "admin-ui-web",
+      "port": 5173
+    },
+    {
+      "name": "admin-ui-api",
+      "port": 4310
+    },
+    {
+      "name": "mcp-ui-dev-host",
+      "port": 4330
+    }
+  ],
+  "terminals": [
+    {
+      "name": "admin-ui",
+      "command": "pnpm dev:admin",
+      "description": "只读管理台开发服务（Vite 前端 :5173 + Hono API :4310）"
+    },
+    {
+      "name": "mcp-ui",
+      "command": "pnpm dev:mcp",
+      "description": "MCP Apps 嵌入式审阅界面本地开发宿主（:4330）"
+    }
+  ]
+}

@@ -32,7 +32,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "pnpm run build:views && tsx dev/host.ts",
+    "dev": "pnpm run build:views && tsx dev/server.ts",
     "build:views": "vite build --mode review && vite build --mode figure",
     "build": "rm -rf dist && pnpm run build:views && tsup",
     "typecheck": "tsc -p tsconfig.json && tsc -p web/tsconfig.json",
