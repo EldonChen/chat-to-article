@@ -94,13 +94,36 @@ export function createDemoArticle(dir?: string): string {
     ],
   });
   writeJson(join(article, "figures", "manifest.json"), {
-    figures: [{ id: "fig-flow", kind: "mermaid", status: "planned", caption: "", alt: "", source: "figures/fig-flow.mmd", prompt: "", license: "", blockIds: ["b002"] }],
+    figures: [
+      {
+        id: "fig-flow",
+        kind: "mermaid",
+        status: "planned",
+        role: "mechanism",
+        intent: "直观展示从事实主张到分享包的四步单向编译链路，省去正文中对文件流转步骤的啰嗦复述。",
+        takeaway: "修改只发生在单块文件内，主张与大纲作为上游契约按引用精确传播。",
+        anchorSummary: "图中节点依次为「主张」→「大纲」→「正文块」→「分享包」；正文直接引用这四个名称，不重复罗列箭头顺序。",
+        caption: "",
+        alt: "",
+        source: "figures/fig-flow.mmd",
+        prompt: "",
+        license: "",
+        blockIds: ["b002"],
+      },
+    ],
   });
   writeText(
     join(article, "blocks", "b001.md"),
     formatBlock(
       { id: "b001", status: "draft", claimIds: ["c1"], figureIds: [] },
       "改文章时，我经常只想换掉一句话。可每次把整篇交出去，拿回来的却是整篇都被动过的稿子。\n",
+    ),
+  );
+  writeText(
+    join(article, "blocks", "b002.md"),
+    formatBlock(
+      { id: "b002", status: "accepted", claimIds: ["c2"], figureIds: ["fig-flow"] },
+      "结构图用 Mermaid 源文件放在 figures/ 下，跟着正文块一起走：主张定了进大纲，大纲拆成正文块，最后同图源一起编译成分享包。\n",
     ),
   );
   writeJsonl(join(article, "revisions.jsonl"), []);
@@ -261,7 +284,18 @@ export function demoInputs(article: string): [ActionKind, Record<string, unknown
             summary: "用流程把前两节串起来",
           },
         ],
-        figures: [{ id: "fig-flow", kind: "mermaid", caption: "修订从主张走到分享包", blockIds: ["b002"] }],
+        figures: [
+          {
+            id: "fig-flow",
+            kind: "mermaid",
+            role: "mechanism",
+            intent: "直观展示从事实主张到分享包的四步单向编译链路，省去正文中对文件流转步骤的啰嗦复述。",
+            takeaway: "修改只发生在单块文件内，主张与大纲作为上游契约按引用精确传播。",
+            anchorSummary: "图中节点依次为「主张」→「大纲」→「正文块」→「分享包」；正文直接引用这四个名称。",
+            caption: "修订从主张走到分享包",
+            blockIds: ["b002"],
+          },
+        ],
       },
     ],
     [
@@ -310,6 +344,10 @@ export function demoInputs(article: string): [ActionKind, Record<string, unknown
       {
         article,
         figureId: "fig-flow",
+        role: "mechanism",
+        intent: "直观展示从事实主张到分享包的四步单向编译链路，省去正文中对文件流转步骤的啰嗦复述。",
+        takeaway: "修改只发生在单块文件内，主张与大纲作为上游契约按引用精确传播。",
+        anchorSummary: "图中节点依次为「主张」→「大纲」→「正文块」→「分享包」；正文直接引用这四个名称，不重复罗列箭头顺序。",
         caption: "修订从主张走到分享包，中间经过大纲和正文块。",
         alt: "从主张到分享包的四步",
         source: "flowchart LR\n  claims[主张] --> outline[大纲]\n  outline --> blocks[正文块]\n  blocks --> export[分享包]",

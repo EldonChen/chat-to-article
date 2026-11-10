@@ -100,9 +100,10 @@ articles/<slug>/
 3. **单篇风格稳定与即时偏好沉淀**：
    - 每篇文章在 `meta.json` 中记录 `styleRevision`，篇内保持同一风格基线；全局 `profile.json` 升版只影响新文章。
    - 作者在审阅某块时给出的改字、批注或选版评价，应即时归纳为可推广的具体写法记入 `preferences.jsonl`，让下一块立刻生效（见 [preferences.md](references/preferences.md)）。
-4. **图表与视觉边界**：
-   - 结构/流程优先用可 diff 的 Mermaid（`.mmd`）；需手调布局的用 draw.io（需导出 `.svg`）；数据图表用 SVG。
-   - **未经用户明确要求，不调用生图工具生成光栅插图（`raster`）**（见 [figures.md](references/figures.md)）。
+4. **视觉表达、多模态生图与图文协同（Figures & Multimodal Co-evolution）**：
+   - **视觉触发与设计简报**：在开场反常识钩子（`hook`）、生活类比/拟人条漫（`analogy`）、笨办法 vs 新方案对比（`comparison`）、多步核心机制（`mechanism`）、数据冲击证据（`evidence`）或全局认知地图（`architecture`）处规划配图，在 `figures/manifest.json` 中记录 `role`、`intent`（配图意图）、`takeaway`（一秒结论）与 `anchorSummary`（图文联动契约）。
+   - **多模态生图与风格统一**：当用户在大纲（`review_outline`）、正文块（`review_block`）或图审阅（`review_figure`）中确认了 `raster` 配图，或在对话中要求生图时（`confirmed: true`），结合本篇锁定的 `visualStyle`（如 `tech-spotlight`、`whiteboard-sketch`、`editorial-comic`、`minimal-blueprint`）组装五要素 `prompt` 调用 `GenerateImage`；优先通过 `reference_image_paths` 传入首张已确认插图或个人范例样张以保持全篇画风一致，生图后立即用 `Read` 工具亲眼检视画面细节。
+   - **看图写文、以图减文与双向迭代**：图负责展示空间结构、分屏反差与完整流转，正文只负责引出问题、引导视线看图眼细节与交代隐含边界，**绝不把图上的步骤用文字啰嗦复述一遍**；当图片迭代导致结构、比喻或结论改变时，将关联块标为 `stale` 并局部微调正文，保持图文同步（详见 [figures.md](references/figures.md)）。
 5. **干净的分享包（`export/`）**：
    - 交付给读者的 `export/` 不含块锚点、不含会话 ID、不含未脱敏的密钥（`sk-...` 等），且所有被大纲引用的块和图均已就绪、无 `ban` 级禁用套话。
 

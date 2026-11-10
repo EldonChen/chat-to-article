@@ -7,7 +7,7 @@ import { formatBlock, parseBlock } from "../src/block.ts";
 import { findArticleDirs, loadArticle } from "../src/article.ts";
 import { compileLexicon, lintBody, loadSharedLexicon } from "../src/lexicon.ts";
 import { renderArticle } from "../src/render.ts";
-import { loadStylePresets } from "../src/voice.ts";
+import { loadStylePresets, loadVisualStylePresets } from "../src/voice.ts";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const skill = join(repo, "skills/chat-to-article");
@@ -57,8 +57,12 @@ test("loads built-in style presets including tech-blogger and all preset samples
   const techBlogger = presets.find((p) => p.id === "tech-blogger");
   assert.ok(techBlogger, "tech-blogger preset should exist");
   assert.equal(techBlogger.name, "科技博主科普");
+  assert.equal(techBlogger.defaultVisualStyle, "tech-spotlight");
   for (const preset of presets) {
     const findings = lintBody(preset.sample, preset.id, rules);
     assert.deepEqual(findings, [], `preset ${preset.id} sample should have no lexicon findings`);
   }
+  const visualStyles = loadVisualStylePresets(skill);
+  assert.ok(visualStyles.some((v) => v.id === "tech-spotlight"));
+  assert.ok(visualStyles.some((v) => v.id === "whiteboard-sketch"));
 });

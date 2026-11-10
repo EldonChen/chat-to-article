@@ -1,12 +1,18 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { readJson, readJsonl, readText } from "./fsutil.ts";
-import type { Candidate, PrivateEntry, Profile, StylePreset, VoiceSnapshot } from "./types.ts";
+import type { Candidate, PrivateEntry, Profile, StylePreset, VisualStylePreset, VoiceSnapshot } from "./types.ts";
 
 export function loadStylePresets(skillDir: string | null): StylePreset[] {
   if (!skillDir) return [];
   const raw = readJson<{ presets?: StylePreset[] }>(join(skillDir, "styles", "presets.json"));
   return Array.isArray(raw?.presets) ? raw.presets : [];
+}
+
+export function loadVisualStylePresets(skillDir: string | null): VisualStylePreset[] {
+  if (!skillDir) return [];
+  const raw = readJson<{ visualStyles?: VisualStylePreset[] }>(join(skillDir, "styles", "presets.json"));
+  return Array.isArray(raw?.visualStyles) ? raw.visualStyles : [];
 }
 
 function walkFiles(dir: string): string[] {
@@ -71,6 +77,7 @@ export function loadVoice(home: string, skillDir?: string | null): VoiceSnapshot
     exemplars,
     candidates: readJsonl<Candidate>(join(home, "candidates.jsonl")),
     presets: loadStylePresets(skillDir ?? null),
+    visualStyles: loadVisualStylePresets(skillDir ?? null),
     errors,
   };
 }

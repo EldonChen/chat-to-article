@@ -29,11 +29,14 @@ test("lists the demo article with gate counts and structured motivation in detai
     plan: { motivation?: { initialConfusion: string; inquiryJourney: unknown[]; ahaMoment: string } };
     claimList: { id: string; role?: string }[];
     outline: { sections: { id: string; readerQuestion?: string; cognitiveRole?: string }[] };
+    figureList: { id: string; role?: string; intent?: string; takeaway?: string; anchorSummary?: string }[];
   }>(`/api/articles/${list[0].id}`);
   assert.ok(detail.plan.motivation?.initialConfusion.includes("整篇重写"));
   assert.equal(detail.plan.motivation?.inquiryJourney.length, 2);
   assert.equal(detail.claimList.find((c) => c.id === "c1")?.role, "insight");
   assert.ok(detail.outline.sections[0]?.readerQuestion?.includes("重写"));
+  assert.equal(detail.figureList[0]?.role, "mechanism");
+  assert.ok(detail.figureList[0]?.takeaway?.includes("单块文件"));
 });
 
 test("serves the share-package markdown as a download", async () => {
@@ -59,9 +62,10 @@ test("is read-only and refuses path traversal", async () => {
 });
 
 test("exposes voice and merged lexicon", async () => {
-  const voice = await json<{ profile: { revision: number }; presets: { id: string; name: string }[] }>("/api/voice");
+  const voice = await json<{ profile: { revision: number }; presets: { id: string; name: string }[]; visualStyles: { id: string }[] }>("/api/voice");
   assert.equal(voice.profile.revision, 1);
   assert.ok(voice.presets.some((p) => p.id === "tech-blogger" && p.name === "科技博主科普"));
+  assert.ok(voice.visualStyles.some((v) => v.id === "tech-spotlight"));
   const lexicon = await json<{ skillDir: string; effective: unknown[] }>("/api/lexicon");
   assert.equal(lexicon.skillDir, skill);
   assert.ok(lexicon.effective.length > 20);

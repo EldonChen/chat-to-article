@@ -89,6 +89,14 @@ export const writingMotivationFields = z.object({
 });
 export type WritingMotivationFields = z.infer<typeof writingMotivationFields>;
 
+export const visualStyleSelection = z.object({
+  id: z.string().min(1).describe("视觉画风 id：tech-spotlight（现代科技解构风）、whiteboard-sketch（手绘白板风）、editorial-comic（科技条漫/插画风）、minimal-blueprint（极简工程蓝图风）或 custom"),
+  name: z.string().optional(),
+  note: z.string().optional(),
+  referenceImage: z.string().optional().describe("全篇画风参考垫图路径（用于传入 GenerateImage 的 reference_image_paths）"),
+});
+export type VisualStyleSelection = z.infer<typeof visualStyleSelection>;
+
 export const writingPlanFields = z.object({
   genre: z.array(z.string()).describe("文体，可组合，例如 [\"工程实践文章\", \"解释性文章\"]"),
   audience: z.string(),
@@ -99,6 +107,7 @@ export const writingPlanFields = z.object({
   approach: z.string().describe("行文方案：推进逻辑，以及为什么适合这篇"),
   openQuestions: z.array(z.string()),
   motivation: writingMotivationFields.optional().describe("从用户连续追问中提取的结构化写作动机与认知轨迹"),
+  visualStyle: visualStyleSelection.optional().describe("全篇统一的视觉配图画风预设与参考垫图"),
 });
 export type WritingPlanFields = z.infer<typeof writingPlanFields>;
 
@@ -196,19 +205,36 @@ export const sectionDraft = z.object({
   cognitiveRole: z.string().optional().describe("这一节在认知爬坡路径中的角色，例如「从痛点切入 → 建立核心洞察」"),
 });
 
+export const visualRoleEnum = z.enum(["hook", "analogy", "comparison", "mechanism", "evidence", "architecture"]);
+export type VisualRoleKind = z.infer<typeof visualRoleEnum>;
+
+export const aspectRatioEnum = z.enum(["1:1", "4:3", "3:4", "16:9", "9:16"]);
+
 export const figureDraft = z.object({
   id: z.string().min(1),
   kind: z.enum(["mermaid", "drawio", "svg-chart", "raster", "remote"]),
+  role: visualRoleEnum
+    .or(z.string())
+    .optional()
+    .describe("视觉认知角色：hook（视觉钩子）、analogy（生活类比/条漫）、comparison（方案反差对比）、mechanism（核心机制拆解）、evidence（数据/实验证据）、architecture（全局认知地图）"),
+  intent: z.string().optional().describe("配图意图（Visual Brief）：为什么这里需要一张图？替正文分担什么解释压力？"),
+  takeaway: z.string().optional().describe("一秒结论（One-glance Takeaway）：读者扫一眼这张图 3 秒内该得出的核心判断"),
+  anchorSummary: z.string().optional().describe("图文联动契约：图内关键节点/视觉锚点，以及正文因有此图可精简的描述"),
   caption: z.string().optional(),
   alt: z.string().optional(),
   source: z.string().optional(),
+  prompt: z.string().optional().describe("当 kind 为 raster 时，提供给多模态生图工具 GenerateImage 的详细画面描述（至少 6 个词）"),
+  aspectRatio: aspectRatioEnum.or(z.string()).optional().describe("多模态生图画幅比例：16:9、4:3、1:1、3:4 或 9:16"),
+  referenceImages: z.array(z.string()).optional().describe("多模态生图的参考垫图路径列表（reference_image_paths）"),
+  confirmed: z.boolean().optional().describe("用户是否已确认授权生成该 raster 插图"),
   blockIds: z.array(z.string()).optional(),
 });
+export type FigureDraftWire = z.infer<typeof figureDraft>;
 
 export const reviewOutlineInput = {
   article: articlePath,
   sections: z.array(sectionDraft).min(1),
-  figures: z.array(figureDraft).optional().describe("大纲里的图位；确认时以 planned 状态写入 figures/manifest.json"),
+  figures: z.array(figureDraft).optional().describe("大纲里的图位；确认时写入 figures/manifest.json（raster 图确认后自动置 confirmed: true）"),
   rationale: z.string().optional(),
 };
 export const reviewOutlineArgs = z.object(reviewOutlineInput);
@@ -217,6 +243,7 @@ export type ReviewOutlineInput = z.infer<typeof reviewOutlineArgs>;
 export const reviewOutlineResult = z.object({
   decision: z.enum(["confirm", "revise"]),
   sections: z.array(sectionDraft),
+  figures: z.array(figureDraft).optional(),
   comments: z.array(z.object({ sectionId: z.string(), text: z.string() })),
   note: z.string().optional(),
 });
@@ -276,11 +303,26 @@ export type TrackedChange = z.infer<typeof trackedChange>;
 export const reviewComment = z.object({ id: z.string(), quote: z.string(), text: z.string() });
 export type ReviewComment = z.infer<typeof reviewComment>;
 
+export const blockFigureRequest = z.object({
+  id: z.string().min(1),
+  kind: z.enum(["mermaid", "drawio", "svg-chart", "raster", "remote"]).or(z.string()).optional(),
+  role: visualRoleEnum.or(z.string()).optional(),
+  intent: z.string().min(1),
+  takeaway: z.string().optional(),
+  anchorSummary: z.string().optional(),
+  prompt: z.string().optional(),
+  aspectRatio: z.string().optional(),
+  caption: z.string().optional(),
+});
+export type BlockFigureRequest = z.infer<typeof blockFigureRequest>;
+
 export const reviewBlockResult = z.object({
   decision: z.enum(["accept", "revise", "later"]),
   finalBody: z.string(),
   changes: z.array(trackedChange),
   comments: z.array(reviewComment),
+  figureIds: z.array(z.string()).optional(),
+  figureRequests: z.array(blockFigureRequest).optional(),
   note: z.string().optional(),
 });
 export type ReviewBlockResult = z.infer<typeof reviewBlockResult>;
@@ -290,8 +332,15 @@ export type ReviewBlockResult = z.infer<typeof reviewBlockResult>;
 export const reviewFigureInput = {
   article: articlePath,
   figureId: z.string().min(1),
-  kind: z.enum(["mermaid", "svg-chart"]).optional().describe("可在界面里直接编辑源文件的图类型，默认 mermaid"),
-  source: z.string().min(1).describe("图源文本。调用时写入 figures/<id>.mmd（或 .svg），图记录置为 drafted"),
+  kind: z.enum(["mermaid", "svg-chart", "drawio", "raster", "remote"]).optional().describe("图类型：mermaid、svg-chart、raster（多模态生图）、drawio 或 remote，默认 mermaid"),
+  role: visualRoleEnum.or(z.string()).optional().describe("视觉认知角色：hook、analogy、comparison、mechanism、evidence、architecture"),
+  intent: z.string().optional().describe("配图意图（Visual Brief）：为什么这里需要一张图"),
+  takeaway: z.string().optional().describe("一秒结论（读者扫一眼得出的核心判断）"),
+  anchorSummary: z.string().optional().describe("图文联动契约（图中关键节点/视觉元素与正文删减/呼应约定）"),
+  source: z.string().min(1).describe("当为 mermaid/svg-chart 时传图源文本（写入 figures/<id>.mmd 或 .svg）；当为 raster/remote 时传图片相对路径（如 figures/<id>.png）或画面描述"),
+  prompt: z.string().optional().describe("当 kind 为 raster 时，提供给 GenerateImage 的画面描述 Prompt"),
+  aspectRatio: aspectRatioEnum.or(z.string()).optional().describe("当 kind 为 raster 时，画幅比例（16:9、4:3、1:1、3:4、9:16）"),
+  referenceImages: z.array(z.string()).optional().describe("当 kind 为 raster 时，传入 GenerateImage 的参考垫图路径列表（reference_image_paths）"),
   caption: z.string().optional(),
   alt: z.string().optional(),
   blockIds: z.array(z.string()).optional(),
@@ -304,6 +353,16 @@ export const reviewFigureResult = z.object({
   source: z.string(),
   caption: z.string(),
   alt: z.string(),
+  role: z.string().optional(),
+  intent: z.string().optional(),
+  takeaway: z.string().optional(),
+  anchorSummary: z.string().optional(),
+  prompt: z.string().optional(),
+  aspectRatio: z.string().optional(),
+  referenceImages: z.array(z.string()).optional(),
+  blockIds: z.array(z.string()).optional(),
+  markBlocksStale: z.boolean().optional(),
+  textSyncNote: z.string().optional(),
   note: z.string().optional(),
 });
 export type ReviewFigureResult = z.infer<typeof reviewFigureResult>;
@@ -361,6 +420,25 @@ export interface SessionDetail<I = unknown, C = unknown> extends SessionSummary 
   response?: string;
 }
 
+export interface BlockFigureWire {
+  id: string;
+  kind: string;
+  status: string;
+  role?: string;
+  intent?: string;
+  takeaway?: string;
+  anchorSummary?: string;
+  caption?: string;
+  alt?: string;
+  source?: string;
+  prompt?: string;
+  aspectRatio?: string;
+  referenceImages?: string[];
+  confirmed?: boolean;
+  content?: string | null;
+  imageDataUrl?: string | null;
+}
+
 export interface BlockContext {
   previousBody: string | null;
   status: string;
@@ -368,6 +446,9 @@ export interface BlockContext {
   readerQuestion?: string | null;
   cognitiveRole?: string | null;
   claims: { id: string; text: string; status: string; role?: string; gapNote?: string }[];
+  figures?: BlockFigureWire[];
+  availableFigures?: BlockFigureWire[];
+  visualStyle?: VisualStyleSelection | null;
   prev: { id: string; body: string } | null;
   next: { id: string; body: string } | null;
   rules: LexiconRuleWire[];
@@ -415,10 +496,27 @@ export interface OutlineContext {
     readerQuestion?: string;
     cognitiveRole?: string;
   }[];
-  figures: { id: string; kind: string; caption?: string; status: string }[];
+  figures: {
+    id: string;
+    kind: string;
+    role?: string;
+    intent?: string;
+    takeaway?: string;
+    anchorSummary?: string;
+    caption?: string;
+    alt?: string;
+    source?: string;
+    prompt?: string;
+    aspectRatio?: string;
+    referenceImages?: string[];
+    confirmed?: boolean;
+    blockIds?: string[];
+    status: string;
+  }[];
   blockStatus: Record<string, string>;
   confirmed: boolean;
   motivation?: WritingMotivationFields | null;
+  visualStyle?: VisualStyleSelection | null;
 }
 
 export interface PlanContext {
@@ -431,4 +529,34 @@ export interface FigureContext {
   previousSource: string | null;
   status: string;
   rules: LexiconRuleWire[];
+  imageDataUrl?: string | null;
+  visualStyle?: VisualStyleSelection | null;
+  styleAnchorImage?: string | null;
+  figure?: {
+    id: string;
+    kind: string;
+    role?: string;
+    intent?: string;
+    takeaway?: string;
+    anchorSummary?: string;
+    caption?: string;
+    alt?: string;
+    source?: string;
+    prompt?: string;
+    aspectRatio?: string;
+    referenceImages?: string[];
+    confirmed?: boolean;
+    blockIds: string[];
+  };
+  linkedBlocks?: {
+    id: string;
+    status: string;
+    sectionTitle?: string | null;
+    body: string;
+  }[];
+  allBlocks?: {
+    id: string;
+    sectionTitle?: string | null;
+    status: string;
+  }[];
 }

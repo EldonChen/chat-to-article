@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { loadBlock, loadClaims, loadFigures, loadOutline, readJson, type WritingPlan } from "@liem-opc/chat-to-article-core";
 import type { z } from "zod";
@@ -31,15 +32,20 @@ import {
   applyClaimDecisions,
   articlePreferences,
   checkDraft,
+  findStyleAnchorImage,
+  invalidateBlocksByFigure,
   lexiconRules,
+  loadBlockFigures,
   loadMeta,
   pinnedProfile,
   promoteStyleRules,
+  readFigureDataUrl,
   readFigureSource,
   requireArticle,
   resolveArticle,
   saveSelectedVoice,
   sectionOfBlock,
+  syncFigureBlockBindings,
   UserFacingError,
   upsertFigures,
   writeBlockDraft,
@@ -124,6 +130,7 @@ const reviewWritingPlan: Handler<typeof reviewWritingPlanArgs, typeof reviewWrit
             approach: existing.approach ?? "",
             openQuestions: existing.openQuestions ?? [],
             ...(existing.motivation ? { motivation: existing.motivation } : {}),
+            ...(existing.visualStyle ? { visualStyle: existing.visualStyle } : {}),
           }
         : null,
       confirmed: !!meta?.writingPlanConfirmed || existing?.status === "confirmed",
@@ -245,10 +252,27 @@ const reviewOutline: Handler<typeof reviewOutlineArgs, typeof reviewOutlineResul
     const context: OutlineContext = {
       claims: loadClaims(dir).map((c) => ({ id: c.id, text: c.text, status: c.status, role: c.role, inquiryTurn: c.inquiryTurn, gapNote: c.gapNote })),
       existing: loadOutline(dir).sections,
-      figures: loadFigures(dir).map((f) => ({ id: f.id, kind: f.kind, caption: f.caption, status: f.status })),
+      figures: loadFigures(dir).map((f) => ({
+        id: f.id,
+        kind: f.kind,
+        role: f.role,
+        intent: f.intent,
+        takeaway: f.takeaway,
+        anchorSummary: f.anchorSummary,
+        caption: f.caption,
+        alt: f.alt,
+        source: f.source,
+        prompt: f.prompt,
+        aspectRatio: f.aspectRatio,
+        referenceImages: f.referenceImages,
+        confirmed: f.confirmed,
+        blockIds: f.blockIds,
+        status: f.status,
+      })),
       blockStatus,
       confirmed: !!meta.outlineConfirmed,
       motivation: plan?.motivation ?? null,
+      visualStyle: plan?.visualStyle ?? null,
     };
     return { title: `大纲：${meta.title}`, article: dir, context };
   },
@@ -264,6 +288,8 @@ const reviewOutline: Handler<typeof reviewOutlineArgs, typeof reviewOutlineResul
         "用户要求修改大纲，没有写入 outline.json。",
         "用户调整后的大纲：",
         JSON.stringify(sections.map(({ summary, ...s }) => ({ ...s, summary })), null, 2),
+        result.figures?.length ? "用户调整后的配图规划：" : null,
+        result.figures?.length ? JSON.stringify(result.figures, null, 2) : null,
         comments.length ? "按章节的意见：" : null,
         ...comments,
         note(result.note),
@@ -271,15 +297,43 @@ const reviewOutline: Handler<typeof reviewOutlineArgs, typeof reviewOutlineResul
       );
     writeOutline(dir, sections);
     const referenced = new Set(sections.flatMap((s) => s.figureIds ?? []));
-    const figures = (input.figures ?? []).filter((f) => referenced.has(f.id));
-    const known = new Set(loadFigures(dir).map((f) => f.id));
+    const candidateFigs = result.figures ?? input.figures ?? [];
+    const figures = candidateFigs.filter((f) => referenced.has(f.id) || (f.blockIds?.length ?? 0) > 0);
+    const known = new Map(loadFigures(dir).map((f) => [f.id, f]));
     upsertFigures(
       dir,
-      figures.map((f) => (known.has(f.id) ? { id: f.id, caption: f.caption, alt: f.alt, blockIds: f.blockIds } : { ...f, status: "planned" })),
+      figures.map((f) => {
+        const ex = known.get(f.id);
+        const kind = f.kind ?? ex?.kind ?? "mermaid";
+        return ex
+          ? {
+              id: f.id,
+              kind,
+              role: f.role ?? ex.role,
+              intent: f.intent ?? ex.intent,
+              takeaway: f.takeaway ?? ex.takeaway,
+              anchorSummary: f.anchorSummary ?? ex.anchorSummary,
+              caption: f.caption ?? ex.caption,
+              alt: f.alt ?? ex.alt,
+              prompt: f.prompt ?? ex.prompt,
+              aspectRatio: f.aspectRatio ?? ex.aspectRatio,
+              referenceImages: f.referenceImages ?? ex.referenceImages,
+              confirmed: kind === "raster" ? true : (f.confirmed ?? ex.confirmed),
+              blockIds: f.blockIds ?? ex.blockIds,
+            }
+          : { ...f, kind, confirmed: kind === "raster" ? true : f.confirmed, status: "planned" };
+      }),
     );
+    for (const f of figures) {
+      if (f.blockIds?.length) syncFigureBlockBindings(dir, f.id, f.blockIds);
+    }
     const missingBlocks = sections.filter((s) => !s.blockIds.length).map((s) => s.id);
+    const plannedRasters = figures.filter((f) => f.kind === "raster");
     return lines(
-      `用户确认了大纲，已写入 outline.json（${sections.length} 节）并更新 meta.json。`,
+      `用户确认了大纲，已写入 outline.json（${sections.length} 节）${figures.length ? `与 figures/manifest.json（${figures.length} 张配图规划）` : ""}并更新 meta.json。`,
+      plannedRasters.length
+        ? `已授权的多模态生图（confirmed: true）：${plannedRasters.map((r) => `${r.id}（${r.role ?? "illustration"}${r.prompt ? `，prompt: "${r.prompt}"` : ""}）`).join("；")}。起草对应章节时可直接调用 GenerateImage 生成图片并用 Read 读图自检，使正文细节与画面咬合。`
+        : null,
       ...comments,
       note(result.note),
       missingBlocks.length && `注意：这些章节还没有分配块 id：${missingBlocks.join("、")}。`,
@@ -403,6 +457,7 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
     const profile = pinnedProfile(meta);
     const plan = readJson<WritingPlan>(join(dir, "writing-plan.json"));
     const section = sectionOfBlock(dir, input.blockId);
+    const { figures, availableFigures } = loadBlockFigures(dir, input.blockId);
     const context: BlockContext = {
       previousBody: previousBody != null && previousBody.trim() !== input.body.trim() ? previousBody : null,
       status: block.meta?.status ?? "draft",
@@ -416,6 +471,9 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
         role: claims.get(id)?.role,
         gapNote: claims.get(id)?.gapNote,
       })),
+      figures,
+      availableFigures,
+      visualStyle: plan?.visualStyle ?? null,
       prev: neighbor(idx - 1),
       next: neighbor(idx + 1),
       rules: lexiconRules(dir),
@@ -437,14 +495,63 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
     const comments = result.comments.map((c) => `- 「${c.quote}」：${c.text}`);
     if (result.decision === "later")
       return lines(`用户暂时不处理 ${input.blockId}，块保持 draft，界面上的修改没有保存。`, note(result.note), ...comments);
+
+    const reqs = result.figureRequests ?? [];
+    const nextFigureIds = new Set<string>(result.figureIds ?? current.meta?.figureIds ?? []);
+    if (reqs.length > 0) {
+      const existingMap = new Map(loadFigures(dir).map((f) => [f.id, f]));
+      upsertFigures(
+        dir,
+        reqs.map((r) => {
+          nextFigureIds.add(r.id);
+          const ex = existingMap.get(r.id);
+          const kind: string = r.kind ?? ex?.kind ?? "mermaid";
+          const blockIds = Array.from(new Set([...(ex?.blockIds ?? []), input.blockId]));
+          return {
+            id: r.id,
+            kind,
+            status: ex?.status ?? "planned",
+            role: r.role ?? ex?.role ?? "mechanism",
+            intent: r.intent,
+            takeaway: r.takeaway ?? ex?.takeaway,
+            anchorSummary: r.anchorSummary ?? ex?.anchorSummary,
+            prompt: r.prompt ?? ex?.prompt ?? (kind === "raster" ? r.intent : ""),
+            aspectRatio: r.aspectRatio ?? ex?.aspectRatio ?? (kind === "raster" ? "16:9" : undefined),
+            confirmed: kind === "raster" ? true : ex?.confirmed,
+            caption: r.caption ?? ex?.caption ?? "",
+            blockIds,
+          };
+        }),
+      );
+      const outline = loadOutline(dir);
+      const sec = outline.sections.find((s) => s.blockIds.includes(input.blockId));
+      if (sec) {
+        const secFigs = new Set(sec.figureIds ?? []);
+        for (const r of reqs) secFigs.add(r.id);
+        sec.figureIds = Array.from(secFigs);
+        writeOutline(dir, outline.sections);
+      }
+    }
+    const finalFigureIds = result.figureIds !== undefined || reqs.length > 0 ? Array.from(nextFigureIds) : undefined;
+    const figLines = reqs.map(
+      (r) =>
+        `- 图 ${r.id}（${r.role ?? "mechanism"} / ${r.kind ?? "mermaid"}）：意图「${r.intent}」${r.takeaway ? `，一秒结论「${r.takeaway}」` : ""}${r.prompt ? `，生图 Prompt「${r.prompt}」` : ""}`,
+    );
+
     if (result.decision === "accept") {
       writeBlockDraft(dir, input.blockId, result.finalBody, {
         status: "accepted",
+        figureIds: finalFigureIds,
         instruction: edited ? "用户在审阅界面修改后接受" : "用户接受这块",
       });
       return lines(
         `用户接受了 ${input.blockId}${edited ? `，并亲手修改了 ${result.changes.length} 处` : ""}。blocks/${input.blockId}.md 已保存并置为 accepted。`,
         ...changes,
+        figLines.length ? "用户在本块新增/更新了配图需求（已写入 figures/manifest.json 并绑定到本块，raster 图已标记 confirmed: true）：" : null,
+        ...figLines,
+        figLines.length
+          ? "若为 raster 图，请结合本篇 visualStyle（及首张已确认图的 reference_image_paths）调用 GenerateImage 生成图片并复制到 figures/，用 Read 读图自检后再调用 review_figure；若为 mermaid/svg-chart，请直接调用 review_figure。"
+          : null,
         comments.length ? "用户留下的批注（供后续参考）：" : null,
         ...comments,
         note(result.note),
@@ -452,9 +559,10 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
         "可继续处理下一块。",
       );
     }
-    if (edited) {
+    if (edited || finalFigureIds !== undefined) {
       writeBlockDraft(dir, input.blockId, result.finalBody, {
         status: "draft",
+        figureIds: finalFigureIds,
         instruction: "用户在审阅界面修改",
       });
     }
@@ -462,6 +570,11 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
       `用户要求按批注修改 ${input.blockId}。${edited ? "用户亲手改的部分已保存到块文件，在此基础上改。" : ""}`,
       changes.length ? "用户的修订：" : null,
       ...changes,
+      figLines.length ? "用户在本块提出的配图需求（已写入 figures/manifest.json 并绑定到本块，raster 图已标记 confirmed: true）：" : null,
+      ...figLines,
+      figLines.length
+        ? "请先生成配图（raster 图调用 GenerateImage + Read 视觉自检，mermaid/svg-chart 调用 review_figure），再按「看图写文、以图减文」原则删减本块中被图替代的冗余过程描述，让文字与画面细节严丝合缝。"
+        : null,
       comments.length ? "批注：" : null,
       ...comments,
       note(result.note),
@@ -478,24 +591,97 @@ const reviewBlock: Handler<typeof reviewBlockArgs, typeof reviewBlockResult> = {
 const reviewFigure: Handler<typeof reviewFigureArgs, typeof reviewFigureResult> = {
   kind: "review_figure",
   description:
-    "把 Mermaid（或 SVG）图源写入 figures/ 并在对话里嵌入实时预览，用户可直接改源码、图注和替代文本，然后接受或要求修改。接受后图记录置为 accepted。",
+    "把 Mermaid、SVG 或多模态生图（raster）写入 figures/ 并在对话里嵌入实时预览；界面同时展示视觉设计简报（角色、配图意图、一秒结论、图文契约）、生图 Prompt/画幅/垫图参考以及关联正文块原文。用户可改图源或 Prompt、勾选将关联正文块标为 stale 以触发图文同步修订。接受后图记录置为 accepted。",
   args: reviewFigureArgs,
   result: reviewFigureResult,
   prepare(input) {
     const dir = resolveArticle(input.article);
     const meta = requireArticle(dir);
-    const kind = input.kind ?? "mermaid";
     const existing = loadFigures(dir).find((f) => f.id === input.figureId);
-    const rel = existing?.source ?? `figures/${input.figureId}.${kind === "mermaid" ? "mmd" : "svg"}`;
-    const previousSource = readFigureSource(dir, rel);
-    writeFigureSource(dir, rel, input.source);
+    const kind: string = input.kind ?? existing?.kind ?? "mermaid";
+    const isTextSource = kind === "mermaid" || kind === "svg-chart";
+    const ext = kind === "svg-chart" ? "svg" : kind === "drawio" ? "drawio" : kind === "raster" || kind === "remote" ? "png" : "mmd";
+    const looksLikePath = /^(figures\/|.*\.(png|jpe?g|webp|gif|svg|drawio|mmd)$)/i.test(input.source.trim());
+    const rel = !isTextSource && looksLikePath ? input.source.trim() : (existing?.source ?? `figures/${input.figureId}.${ext}`);
+    const previousSource = isTextSource ? readFigureSource(dir, rel) : (existing?.prompt ?? null);
+    if (isTextSource) {
+      writeFigureSource(dir, rel, input.source);
+    }
+    const resolvedPrompt =
+      input.prompt ?? (kind === "raster" && !looksLikePath ? input.source.trim() : existing?.prompt ?? "");
+    const blockIds = input.blockIds ?? existing?.blockIds ?? [];
+    const styleAnchorImage = findStyleAnchorImage(dir, input.figureId);
+    const defaultRefs =
+      input.referenceImages ?? existing?.referenceImages ?? (kind === "raster" && styleAnchorImage ? [styleAnchorImage] : undefined);
     upsertFigures(dir, [
-      { id: input.figureId, kind, source: rel, status: "drafted", caption: input.caption ?? existing?.caption, alt: input.alt ?? existing?.alt, blockIds: input.blockIds ?? existing?.blockIds },
+      {
+        id: input.figureId,
+        kind,
+        source: rel,
+        status: "drafted",
+        role: input.role ?? existing?.role,
+        intent: input.intent ?? existing?.intent,
+        takeaway: input.takeaway ?? existing?.takeaway,
+        anchorSummary: input.anchorSummary ?? existing?.anchorSummary,
+        prompt: resolvedPrompt,
+        aspectRatio: input.aspectRatio ?? existing?.aspectRatio ?? (kind === "raster" ? "16:9" : undefined),
+        referenceImages: defaultRefs,
+        confirmed: kind === "raster" ? true : existing?.confirmed,
+        caption: input.caption ?? existing?.caption,
+        alt: input.alt ?? existing?.alt,
+        blockIds,
+      },
     ]);
+    if (input.blockIds) {
+      syncFigureBlockBindings(dir, input.figureId, input.blockIds);
+    }
+    const updatedFig = loadFigures(dir).find((f) => f.id === input.figureId);
+    const outline = loadOutline(dir);
+    const allBlocks: NonNullable<FigureContext["allBlocks"]> = [];
+    const linkedBlocks: NonNullable<FigureContext["linkedBlocks"]> = [];
+    const linkedSet = new Set(updatedFig?.blockIds ?? []);
+    for (const sec of outline.sections) {
+      for (const bId of sec.blockIds) {
+        const b = loadBlock(dir, bId, sec.id);
+        const status = b.exists ? (b.meta?.status ?? "draft") : "missing";
+        allBlocks.push({ id: bId, sectionTitle: sec.title, status });
+        if (linkedSet.has(bId) || (b.meta?.figureIds ?? []).includes(input.figureId)) {
+          linkedBlocks.push({ id: bId, status, sectionTitle: sec.title, body: b.body });
+        }
+      }
+    }
+    const plan = readJson<WritingPlan>(join(dir, "writing-plan.json"));
+    const imageDataUrl = !isTextSource && updatedFig ? readFigureDataUrl(dir, updatedFig) : null;
     const context: FigureContext = {
-      previousSource: previousSource != null && previousSource.trim() !== input.source.trim() ? previousSource : null,
+      previousSource:
+        previousSource != null && previousSource.trim() !== (isTextSource ? input.source.trim() : resolvedPrompt.trim())
+          ? previousSource
+          : null,
       status: "drafted",
       rules: lexiconRules(dir),
+      imageDataUrl,
+      visualStyle: plan?.visualStyle ?? null,
+      styleAnchorImage,
+      figure: updatedFig
+        ? {
+            id: updatedFig.id,
+            kind: updatedFig.kind,
+            role: updatedFig.role,
+            intent: updatedFig.intent,
+            takeaway: updatedFig.takeaway,
+            anchorSummary: updatedFig.anchorSummary,
+            caption: updatedFig.caption,
+            alt: updatedFig.alt,
+            source: updatedFig.source,
+            prompt: updatedFig.prompt,
+            aspectRatio: updatedFig.aspectRatio,
+            referenceImages: updatedFig.referenceImages,
+            confirmed: updatedFig.confirmed,
+            blockIds: linkedBlocks.map((b) => b.id),
+          }
+        : undefined,
+      linkedBlocks,
+      allBlocks,
     };
     return { title: `图 ${input.figureId}：${meta.title}`, article: dir, context };
   },
@@ -503,20 +689,79 @@ const reviewFigure: Handler<typeof reviewFigureArgs, typeof reviewFigureResult> 
     const dir = resolveArticle(input.article);
     if (result.decision === "later") return lines(`用户暂时不处理图 ${input.figureId}，保持 drafted。`, note(result.note));
     const fig = loadFigures(dir).find((f) => f.id === input.figureId);
-    const rel = fig?.source ?? `figures/${input.figureId}.mmd`;
-    const sourceChanged = (readFigureSource(dir, rel) ?? "").trim() !== result.source.trim();
-    if (sourceChanged) writeFigureSource(dir, rel, result.source);
+    const kind = fig?.kind ?? input.kind ?? "mermaid";
+    const isTextSource = kind === "mermaid" || kind === "svg-chart";
+    const rel = fig?.source ?? `figures/${input.figureId}.${kind === "svg-chart" ? "svg" : kind === "raster" ? "png" : "mmd"}`;
+    const sourceChanged = isTextSource
+      ? (readFigureSource(dir, rel) ?? "").trim() !== result.source.trim()
+      : (fig?.prompt ?? "").trim() !== (result.prompt ?? "").trim();
+    if (isTextSource && sourceChanged) writeFigureSource(dir, rel, result.source);
+    const targetBlockIds = result.blockIds ?? fig?.blockIds;
+    const nextPrompt = result.prompt !== undefined ? result.prompt.trim() : fig?.prompt;
+    const nextAspectRatio = result.aspectRatio !== undefined ? result.aspectRatio.trim() || undefined : fig?.aspectRatio;
+    const nextRefs = result.referenceImages !== undefined ? result.referenceImages.filter((r) => r.trim()) : fig?.referenceImages;
     upsertFigures(dir, [
-      { id: input.figureId, caption: result.caption, alt: result.alt, status: result.decision === "accept" ? "accepted" : "drafted" },
+      {
+        id: input.figureId,
+        caption: result.caption,
+        alt: result.alt,
+        ...(result.role !== undefined ? { role: result.role.trim() || undefined } : {}),
+        ...(result.intent !== undefined ? { intent: result.intent.trim() || undefined } : {}),
+        ...(result.takeaway !== undefined ? { takeaway: result.takeaway.trim() || undefined } : {}),
+        ...(result.anchorSummary !== undefined ? { anchorSummary: result.anchorSummary.trim() || undefined } : {}),
+        ...(nextPrompt !== undefined ? { prompt: nextPrompt } : {}),
+        ...(nextAspectRatio !== undefined ? { aspectRatio: nextAspectRatio } : {}),
+        ...(nextRefs !== undefined ? { referenceImages: nextRefs } : {}),
+        ...(kind === "raster" ? { confirmed: true } : {}),
+        ...(targetBlockIds !== undefined ? { blockIds: targetBlockIds } : {}),
+        status: result.decision === "accept" ? "accepted" : "drafted",
+      },
     ]);
+    if (result.blockIds !== undefined) {
+      syncFigureBlockBindings(dir, input.figureId, result.blockIds);
+    }
+    const shouldInvalidate = !!result.markBlocksStale || !!result.textSyncNote?.trim();
+    const staleBlocks = shouldInvalidate ? invalidateBlocksByFigure(dir, input.figureId, targetBlockIds) : [];
+    const syncLines = [
+      result.textSyncNote?.trim() ? `用户的图文联动修改意见：${result.textSyncNote.trim()}` : null,
+      staleBlocks.length
+        ? `因图片迭代需要同步调整正文，关联块已自动标为 stale：${staleBlocks.join("、")}。请结合最新图与图文联动契约，调用 review_block 动态调整这些块的正文（删除已被图直观表达的冗余过程描述、对齐图中视觉元素与节点术语）。`
+        : null,
+    ];
     if (result.decision === "accept")
       return lines(
-        `用户接受了图 ${input.figureId}，图记录已置为 accepted${sourceChanged ? "，用户改过图源，已保存" : ""}。`,
+        `用户接受了图 ${input.figureId}，图记录已置为 accepted${sourceChanged ? "，用户改过图源/Prompt，已保存" : ""}。`,
         `图注：${result.caption || "（空）"}`,
+        result.takeaway?.trim() ? `一秒结论：${result.takeaway.trim()}` : null,
+        result.anchorSummary?.trim() ? `图文联动契约：${result.anchorSummary.trim()}` : null,
+        ...syncLines,
         note(result.note),
       );
+    if (kind === "raster") {
+      const currentImgFull = join(dir, rel);
+      const refHint = nextRefs?.length
+        ? `reference_image_paths: ${JSON.stringify(nextRefs)}`
+        : existsSync(currentImgFull)
+          ? `若需保持当前构图局部微调，可将当前图片 ${currentImgFull} 传入 reference_image_paths`
+          : null;
+      return lines(
+        `用户要求重新生成或微调多模态图片 ${input.figureId}（已授权 confirmed: true）。`,
+        result.intent?.trim() ? `配图意图：${result.intent.trim()}` : null,
+        result.takeaway?.trim() ? `一秒结论：${result.takeaway.trim()}` : null,
+        nextPrompt ? `生图 Prompt：${nextPrompt}` : null,
+        nextAspectRatio ? `画幅比例（aspect_ratio）：${nextAspectRatio}` : null,
+        refHint,
+        ...syncLines,
+        note(result.note),
+        `请调用 GenerateImage 生成图片并保存到 ${join(dir, rel)}，用 Read 工具亲眼检查画面细节后，再次调用 review_figure。`,
+      );
+    }
     return lines(
       `用户要求修改图 ${input.figureId}${sourceChanged ? "（用户改过的图源已保存，在此基础上改）" : ""}。`,
+      result.intent?.trim() ? `配图意图：${result.intent.trim()}` : null,
+      result.takeaway?.trim() ? `一秒结论：${result.takeaway.trim()}` : null,
+      result.anchorSummary?.trim() ? `图文联动契约：${result.anchorSummary.trim()}` : null,
+      ...syncLines,
       note(result.note),
       "当前图源：",
       "```mermaid",

@@ -8,6 +8,15 @@ import { Markdown, Mermaid } from "../components/Markdown.tsx";
 import { buttonClass, Card, CopyButton, Empty, KV, Segmented, StatusBadge, Tag } from "../components/ui.tsx";
 import { useUi } from "../store.ts";
 
+const VISUAL_ROLE_LABELS: Record<string, string> = {
+  hook: "视觉钩子",
+  analogy: "生活类比/条漫",
+  comparison: "方案对比",
+  mechanism: "机制拆解",
+  evidence: "数据证据",
+  architecture: "全局地图",
+};
+
 function FigureView({ article, figure }: { article: ArticleDetail; figure: Figure }) {
   const source = article.figureSources[figure.id];
   let body;
@@ -18,15 +27,25 @@ function FigureView({ article, figure }: { article: ArticleDetail; figure: Figur
     body = <img src={assetUrl(article.id, figure.source.replace(/\.[^./]+$/, ".svg"))} alt={figure.alt ?? figure.id} className="mx-auto max-h-96" />;
   else
     body = (
-      <div className="flex items-center justify-center gap-2 py-8 text-sm text-stone-400">
-        <ImageIcon className="size-4" /> 图位 {figure.id} 还没有可预览的文件
+      <div className="flex flex-col items-center justify-center gap-1.5 py-6 text-sm text-stone-400">
+        <div className="flex items-center gap-2">
+          <ImageIcon className="size-4" /> 图位 {figure.id} 还没有可预览的文件
+        </div>
+        {figure.intent && <p className="max-w-lg text-center text-xs text-stone-500">配图意图：{figure.intent}</p>}
       </div>
     );
   return (
     <figure className="my-4 rounded-xl border border-dashed border-stone-200 p-3 dark:border-stone-700">
+      {figure.takeaway && (
+        <div className="mb-2 rounded-lg bg-emerald-50/60 px-3 py-1.5 text-xs text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+          <span className="font-semibold">一秒结论：</span>
+          {figure.takeaway}
+        </div>
+      )}
       {body}
       <figcaption className="mt-2 flex flex-wrap items-center justify-center gap-2 text-xs text-stone-500">
         <Tag mono>{figure.id}</Tag>
+        {figure.role && <Tag>{VISUAL_ROLE_LABELS[figure.role] ?? figure.role}</Tag>}
         <StatusBadge status={figure.status} />
         {figure.caption}
       </figcaption>
@@ -258,6 +277,8 @@ export function PlanTab({ article }: { article: ArticleDetail }) {
               ["读者", plan.audience || null],
               ["目的", plan.purpose || null],
               ["行文方案", plan.approach || null],
+              ["文字笔调", plan.voice ? `${plan.voice.name || plan.voice.id}${plan.voice.note ? `（${plan.voice.note}）` : ""}` : null],
+              ["视觉画风", plan.visualStyle ? `${plan.visualStyle.name || plan.visualStyle.id}${plan.visualStyle.note ? `（${plan.visualStyle.note}）` : ""}` : null],
             ]}
           />
         </Card>
@@ -434,15 +455,35 @@ export function FiguresTab({ article }: { article: ArticleDetail }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {article.figureList.map((f) => (
-        <Card key={f.id} title={<span className="font-mono">{f.id}</span>} actions={<><Tag>{f.kind}</Tag><StatusBadge status={f.status} /></>}>
+        <Card
+          key={f.id}
+          title={<span className="font-mono">{f.id}</span>}
+          actions={
+            <>
+              {f.role && <Tag>{VISUAL_ROLE_LABELS[f.role] ?? f.role}</Tag>}
+              <Tag>{f.kind}</Tag>
+              <StatusBadge status={f.status} />
+            </>
+          }
+        >
           <FigureView article={article} figure={f} />
           <KV
             items={[
+              ["视觉角色", f.role ? (VISUAL_ROLE_LABELS[f.role] ?? f.role) : null],
+              ["配图意图", f.intent || null],
+              ["一秒结论", f.takeaway || null],
+              ["图文契约", f.anchorSummary || null],
               ["说明", f.caption || null],
               ["替代文本", f.alt || null],
               ["源文件", f.source ? <code className="text-xs">{f.source}</code> : null],
               ["引用块", f.blockIds?.join("、") || null],
-              ...(f.kind === "raster" ? ([["提示词", f.prompt || null]] as [string, string | null][]) : []),
+              ...(f.kind === "raster"
+                ? ([
+                    ["生图提示词", f.prompt || null],
+                    ["画幅比例", f.aspectRatio || null],
+                    ["参考垫图", f.referenceImages?.join("、") || null],
+                  ] as [string, string | null][])
+                : []),
               ...(f.kind === "remote" ? ([["出处/许可", f.license || null]] as [string, string | null][]) : []),
             ]}
           />

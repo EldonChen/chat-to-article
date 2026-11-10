@@ -10,20 +10,24 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Image as ImageIcon,
   Italic,
   MessageSquarePlus,
   PenLine,
+  Plus,
   Redo2,
   Send,
   Trash2,
   Undo2,
+  Wand2,
   X,
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
-import type { BlockContext, ReviewBlockInput, ReviewBlockResult, SessionDetail } from "../../../src/shared/actions.ts";
+import type { BlockContext, BlockFigureRequest, ReviewBlockInput, ReviewBlockResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { Mermaid } from "../components/Mermaid.tsx";
 import { TextDiff, textChanges } from "../components/TextDiff.tsx";
-import { Badge, Tag } from "../components/ui.tsx";
+import { AutoTextarea, Badge, buttonClass, inputClass, Tag, useDarkMode } from "../components/ui.tsx";
 import { addComment, CommentMark, commentRanges, removeComment } from "../editor/comments.ts";
 import { compileRules, LexiconLint, lintDoc } from "../editor/lint.ts";
 import { docToMarkdown, markdownToHtml } from "../editor/markdown.ts";
@@ -42,15 +46,19 @@ import {
   type ChangeCard,
 } from "../editor/trackChanges.ts";
 import { useDraft, useUi } from "../store.ts";
+import { ASPECT_RATIOS, VISUAL_ROLES } from "./OutlineView.tsx";
+import { VISUAL_STYLE_PRESETS } from "./PlanView.tsx";
 import type { SubmitFn } from "./types.ts";
 
 interface Draft {
   doc: Record<string, unknown> | null;
   comments: Record<string, string>;
+  figureIds: string[];
+  figureRequests: BlockFigureRequest[];
   note: string;
 }
 
-type SideTab = "changes" | "comments" | "basis" | "context";
+type SideTab = "changes" | "comments" | "figures" | "basis" | "context";
 
 function ToolButton({ onClick, active, disabled, title, children }: { onClick: () => void; active?: boolean; disabled?: boolean; title: string; children: ReactNode }) {
   return (
@@ -120,14 +128,33 @@ function ChangeItem({ card, editor, focused, onFocus }: { card: ChangeCard; edit
 
 export function BlockReview({ session, submit }: { session: SessionDetail<ReviewBlockInput, BlockContext>; submit: SubmitFn }) {
   const { input, context } = session;
+  const dark = useDarkMode();
   const rules = useMemo(() => compileRules(context.rules), [context.rules]);
-  const [draft, setDraft] = useDraft<Draft>(session.id, () => ({ doc: null, comments: {}, note: "" }));
+  const initialFigureIds = useMemo(
+    () => input.figureIds ?? (context.figures ?? []).map((f) => f.id),
+    [input.figureIds, context.figures],
+  );
+  const [draft, setDraft] = useDraft<Draft>(session.id, () => ({
+    doc: null,
+    comments: {},
+    figureIds: initialFigureIds,
+    figureRequests: [],
+    note: "",
+  }));
   const { showMarkup, setShowMarkup } = useUi();
   const [, force] = useState(0);
-  const [tab, setTab] = useState<SideTab>("changes");
+  const [tab, setTab] = useState<SideTab>(() => ((context.figures?.length ?? 0) > 0 ? "figures" : "changes"));
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [activeComment, setActiveComment] = useState<string | null>(null);
   const [bubble, setBubble] = useState<{ top: number; left: number } | null>(null);
+  const [newFigRole, setNewFigRole] = useState<string>("comparison");
+  const [newFigKind, setNewFigKind] = useState<string>("raster");
+  const [newFigIntent, setNewFigIntent] = useState<string>("");
+  const [newFigTakeaway, setNewFigTakeaway] = useState<string>("");
+  const [newFigAnchor, setNewFigAnchor] = useState<string>("");
+  const [newFigPrompt, setNewFigPrompt] = useState<string>("");
+  const [newFigAspectRatio, setNewFigAspectRatio] = useState<string>("16:9");
+
   const paperRef = useRef<HTMLDivElement>(null);
   const commentInputs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const editor = useEditor({
@@ -165,12 +192,48 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
   const lint = useMemo(() => (doc ? lintDoc(doc, rules) : []), [doc, rules]);
   const bans = lint.filter((h) => h.severity === "ban");
   const finalMarkdown = useMemo(() => (editor && doc ? docToMarkdown(editor.schema.nodeFromJSON(finalDocJSON(doc))) : input.body), [editor, doc, input.body]);
-  // 和编辑器序列化结果比较，避免 markdown 写法差异被当成修改
   const agentMarkdown = useMemo(() => (editor ? docToMarkdown(parseMarkdown(editor, input.body)) : input.body), [editor, input.body]);
   const edited = finalMarkdown.trim() !== agentMarkdown.trim();
   const comments = ranges.map((r) => ({ ...r, text: draft.comments[r.id] ?? "" }));
   const filledComments = comments.filter((c) => c.text.trim());
   const paragraphs = finalMarkdown.split(/\n{2,}/).map((p) => p.replace(/\s+/g, "")).filter((p) => p && !p.startsWith("#"));
+
+  const availableFigures = context.availableFigures ?? context.figures ?? [];
+  const currentFigureIds = draft.figureIds ?? initialFigureIds;
+  const figureRequests = draft.figureRequests ?? [];
+  const attachedFigures = availableFigures.filter((f) => currentFigureIds.includes(f.id));
+  const figuresChanged = JSON.stringify(currentFigureIds) !== JSON.stringify(initialFigureIds) || figureRequests.length > 0;
+  const activeVisualPreset = VISUAL_STYLE_PRESETS.find((p) => p.id === context.visualStyle?.id);
+
+  const addFigureRequest = () => {
+    if (!newFigIntent.trim()) return;
+    const existingIds = new Set([...availableFigures.map((f) => f.id), ...figureRequests.map((r) => r.id)]);
+    let idx = 1;
+    let id = `fig-${input.blockId}-${idx}`;
+    while (existingIds.has(id)) {
+      idx++;
+      id = `fig-${input.blockId}-${idx}`;
+    }
+    const req: BlockFigureRequest = {
+      id,
+      kind: newFigKind,
+      role: newFigRole,
+      intent: newFigIntent.trim(),
+      takeaway: newFigTakeaway.trim() || undefined,
+      anchorSummary: newFigAnchor.trim() || undefined,
+      prompt: newFigKind === "raster" ? (newFigPrompt.trim() || undefined) : undefined,
+      aspectRatio: newFigKind === "raster" ? newFigAspectRatio : undefined,
+    };
+    setDraft((d) => ({
+      ...d,
+      figureIds: [...new Set([...(d.figureIds ?? initialFigureIds), id])],
+      figureRequests: [...(d.figureRequests ?? []), req],
+    }));
+    setNewFigIntent("");
+    setNewFigTakeaway("");
+    setNewFigAnchor("");
+    setNewFigPrompt("");
+  };
 
   const startComment = useCallback(() => {
     if (!editor) return;
@@ -202,18 +265,20 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
       finalBody: edited ? finalMarkdown : input.body,
       changes,
       comments: filledComments.map((c) => ({ id: c.id, quote: c.quote, text: c.text.trim() })),
+      ...(figuresChanged ? { figureIds: currentFigureIds } : {}),
+      ...(figureRequests.length > 0 ? { figureRequests } : {}),
       note: draft.note.trim() || undefined,
     };
     submit(id, result);
   };
 
-  const canRevise = edited || filledComments.length > 0 || !!draft.note.trim();
+  const canRevise = edited || filledComments.length > 0 || figuresChanged || !!draft.note.trim();
   const styleTag = activeComment ? `[data-comment="${activeComment}"]{background:rgb(252 211 77 / .75);border-color:#d97706}` : "";
 
   return (
     <>
       <style>{styleTag}</style>
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_23rem]">
         <div className="min-w-0 space-y-4">
           {input.instruction && (
             <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
@@ -245,6 +310,9 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
               <span className="mx-1 h-4 w-px bg-stone-200 dark:bg-stone-700" />
               <ToolButton title="为选中的文字添加批注" disabled={editor.state.selection.empty} onClick={startComment}>
                 <MessageSquarePlus className="size-3.5" /> 批注
+              </ToolButton>
+              <ToolButton title="查看或为本块规划配图（看图写文、以图减文）" active={tab === "figures"} onClick={() => setTab("figures")}>
+                <ImageIcon className="size-3.5" /> 配图({attachedFigures.length + figureRequests.length})
               </ToolButton>
               <span className="mx-1 h-4 w-px bg-stone-200 dark:bg-stone-700" />
               <ToolButton title="加粗" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
@@ -283,6 +351,73 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
                 </div>
               )}
               <EditorContent editor={editor} />
+
+              {(attachedFigures.length > 0 || figureRequests.length > 0) && (
+                <div className="mt-6 space-y-4 border-t border-dashed border-stone-200 pt-5 font-sans dark:border-stone-800">
+                  <div className="flex items-center justify-between text-xs text-stone-500">
+                    <span className="font-medium text-sky-700 dark:text-sky-300">本块配图同屏对照（检查正文是否与图重复啰嗦、画面细节是否咬合）</span>
+                    <button type="button" onClick={() => setTab("figures")} className="text-sky-600 hover:underline dark:text-sky-400">
+                      管理本块配图 →
+                    </button>
+                  </div>
+                  {attachedFigures.map((fig) => {
+                    const vRole = VISUAL_ROLES.find((r) => r.id === fig.role);
+                    return (
+                      <figure key={fig.id} className="rounded-xl border border-stone-200/90 bg-stone-50/70 p-4 dark:border-stone-800 dark:bg-stone-950/60">
+                        <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+                          <span className="font-mono font-semibold text-stone-700 dark:text-stone-200">{fig.id}</span>
+                          <Badge tone={fig.kind === "raster" ? "violet" : "gray"}>{fig.kind}</Badge>
+                          {vRole && <Badge tone={vRole.tone}>{vRole.label}</Badge>}
+                          <Badge tone={fig.status === "accepted" ? "green" : fig.status === "drafted" ? "blue" : "amber"}>{fig.status}</Badge>
+                          {fig.takeaway && <span className="ml-1 text-emerald-700 dark:text-emerald-300">图眼：{fig.takeaway}</span>}
+                        </div>
+                        {fig.kind === "mermaid" && fig.content ? (
+                          <div className="rounded-lg bg-white p-3 dark:bg-stone-900">
+                            <Mermaid source={fig.content} dark={dark} />
+                          </div>
+                        ) : fig.kind === "svg-chart" && fig.content ? (
+                          <div className="rounded-lg bg-white p-3 dark:bg-stone-900">
+                            <img alt={fig.alt ?? fig.id} className="mx-auto max-h-72" src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(fig.content)}`} />
+                          </div>
+                        ) : fig.imageDataUrl ? (
+                          <div className="rounded-lg bg-white p-3 dark:bg-stone-900">
+                            <img alt={fig.alt ?? fig.id} className="mx-auto max-h-80 rounded object-contain" src={fig.imageDataUrl} />
+                          </div>
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-stone-200 py-4 text-center text-xs text-stone-400 dark:border-stone-800">
+                            {fig.intent ? `规划意图：${fig.intent}` : `图位 ${fig.id}（${fig.status}）待生成图源`}
+                            {fig.prompt && <div className="mt-1 font-mono text-[11px] text-violet-500">Prompt: {fig.prompt}</div>}
+                          </div>
+                        )}
+                        {fig.caption && <figcaption className="mt-2 text-center text-xs text-stone-500">{fig.caption}</figcaption>}
+                        {fig.anchorSummary && (
+                          <div className="mt-2 rounded bg-amber-50/60 px-2.5 py-1.5 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                            <span className="font-semibold">图文联动契约：</span>
+                            {fig.anchorSummary}
+                          </div>
+                        )}
+                      </figure>
+                    );
+                  })}
+                  {figureRequests.map((req) => {
+                    const vRole = VISUAL_ROLES.find((r) => r.id === req.role);
+                    return (
+                      <div key={req.id} className="rounded-xl border border-dashed border-sky-300 bg-sky-50/40 p-3 text-xs dark:border-sky-800 dark:bg-sky-950/20">
+                        <div className="flex items-center gap-1.5">
+                          <Badge tone="blue">新增配图请求</Badge>
+                          <span className="font-mono font-semibold">{req.id}</span>
+                          <Badge tone={req.kind === "raster" ? "violet" : "gray"}>{req.kind ?? "raster"}</Badge>
+                          {vRole && <Badge tone={vRole.tone}>{vRole.label}</Badge>}
+                        </div>
+                        <p className="mt-1 text-stone-700 dark:text-stone-200">配图意图：{req.intent}</p>
+                        {req.takeaway && <p className="mt-0.5 text-emerald-700 dark:text-emerald-300">一秒结论：{req.takeaway}</p>}
+                        {req.prompt && <p className="mt-0.5 font-mono text-[11px] text-violet-600 dark:text-violet-300">Prompt：{req.prompt}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {context.next && (
                 <div className="mt-6 border-l-2 border-stone-200 pl-4 font-serif text-sm leading-7 text-stone-400 dark:border-stone-700" title="后一块，只读">
                   <span className="mr-2 font-sans text-xs">{context.next.id} ↓</span>
@@ -294,11 +429,12 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
         </div>
 
         <aside className="space-y-3 @4xl:sticky @4xl:top-4 @4xl:self-start">
-          <div className="flex gap-1 rounded-lg bg-stone-200/60 p-0.5 dark:bg-stone-800">
+          <div className="flex flex-wrap gap-1 rounded-lg bg-stone-200/60 p-0.5 dark:bg-stone-800">
             {(
               [
                 ["changes", `修订 ${cards.length}`],
                 ["comments", `批注 ${comments.length}`],
+                ["figures", `配图 ${attachedFigures.length + figureRequests.length}`],
                 ["basis", `依据${bans.length ? ` ⚠${bans.length}` : ""}`],
                 ["context", "上下文"],
               ] as [SideTab, string][]
@@ -394,6 +530,206 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {tab === "figures" && (
+            <div className="space-y-3 text-xs">
+              <section className="rounded-lg border border-sky-200/80 bg-sky-50/40 p-3 dark:border-sky-900/60 dark:bg-sky-950/20">
+                <h4 className="mb-1.5 font-semibold text-sky-900 dark:text-sky-200">图文协同「看图写文、以图减文」自查</h4>
+                <ul className="list-disc space-y-1 pl-4 leading-relaxed text-stone-600 dark:text-stone-300">
+                  <li>
+                    <strong>图替文言</strong>：图上已画出的步骤/分屏对比，正文绝不按顺序再啰嗦抄一遍。
+                  </li>
+                  <li>
+                    <strong>看图咬合</strong>：正文直接指代画面里的视觉元素（如「看下图左侧标红的单车道」），点出反差与隐含边界。
+                  </li>
+                  <li>
+                    <strong>锚点对齐</strong>：正文中提到的组件名、序号与图中元素完全一致。
+                  </li>
+                </ul>
+              </section>
+
+              {availableFigures.length > 0 && (
+                <section className="rounded-lg border border-stone-200 bg-white p-3 dark:border-stone-700 dark:bg-stone-900">
+                  <h4 className="mb-2 font-medium text-stone-500">挂载已有图位到本块</h4>
+                  <div className="space-y-1.5">
+                    {availableFigures.map((f) => {
+                      const on = currentFigureIds.includes(f.id);
+                      const vRole = VISUAL_ROLES.find((r) => r.id === f.role);
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() =>
+                            setDraft((d) => {
+                              const list = d.figureIds ?? initialFigureIds;
+                              return { ...d, figureIds: on ? list.filter((x) => x !== f.id) : [...list, f.id] };
+                            })
+                          }
+                          className={clsx(
+                            "flex w-full items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-left transition",
+                            on
+                              ? "border-sky-400 bg-sky-50/70 text-stone-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-stone-100"
+                              : "border-stone-200 text-stone-500 hover:border-stone-300 dark:border-stone-800",
+                          )}
+                        >
+                          <span className="font-mono font-semibold">{f.id}</span>
+                          <Badge tone={f.kind === "raster" ? "violet" : "gray"}>{f.kind}</Badge>
+                          {vRole && <Badge tone={vRole.tone}>{vRole.label}</Badge>}
+                          <span className="ml-auto">
+                            <Badge tone={f.status === "accepted" ? "green" : f.status === "drafted" ? "blue" : "amber"}>{f.status}</Badge>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              <section className="rounded-lg border border-stone-200 bg-white p-3 dark:border-stone-700 dark:bg-stone-900">
+                <h4 className="mb-2 flex items-center gap-1.5 font-medium text-stone-700 dark:text-stone-200">
+                  <Wand2 className="size-3.5 text-violet-600" />
+                  觉得这段文字太干？在此块补一张图
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1">
+                    {(
+                      [
+                        ["raster", "AI 多模态生图"],
+                        ["svg-chart", "富排版 SVG/数据图"],
+                        ["mermaid", "Mermaid 逻辑图"],
+                        ["drawio", "draw.io"],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setNewFigKind(k)}
+                        className={clsx(
+                          "rounded px-1.5 py-0.5 text-[11px] transition",
+                          newFigKind === k
+                            ? k === "raster"
+                              ? "bg-violet-600 text-white"
+                              : "bg-sky-600 text-white"
+                            : "bg-stone-100 text-stone-500 dark:bg-stone-800",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {VISUAL_ROLES.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        title={r.hint}
+                        onClick={() => setNewFigRole(r.id)}
+                        className={clsx(
+                          "rounded px-1.5 py-0.5 text-[11px] transition",
+                          newFigRole === r.id ? "bg-emerald-600 text-white" : "bg-stone-100 text-stone-500 dark:bg-stone-800",
+                        )}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <AutoTextarea
+                    value={newFigIntent}
+                    onChange={setNewFigIntent}
+                    placeholder="配图意图（必填）：这里哪段解释太绕口？想画什么对比、生活隐喻或流程来代替文字？"
+                    minRows={2}
+                    className="text-xs"
+                  />
+                  <input
+                    value={newFigTakeaway}
+                    onChange={(e) => setNewFigTakeaway(e.target.value)}
+                    placeholder="一秒结论（可选）：读者看一眼这张图能立刻明白什么？"
+                    className={clsx(inputClass, "text-xs")}
+                  />
+                  {newFigKind === "raster" && (
+                    <div className="space-y-1.5 rounded-md border border-violet-200/80 bg-violet-50/40 p-2 dark:border-violet-900/60 dark:bg-violet-950/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium text-violet-800 dark:text-violet-300">多模态生图描述（可留空由 Agent 自动组装）</span>
+                        <div className="flex gap-1">
+                          {ASPECT_RATIOS.map((ar) => (
+                            <button
+                              key={ar}
+                              type="button"
+                              onClick={() => setNewFigAspectRatio(ar)}
+                              className={clsx(
+                                "rounded px-1 py-0.5 font-mono text-[10px]",
+                                newFigAspectRatio === ar ? "bg-violet-600 text-white" : "bg-white text-stone-500 dark:bg-stone-800",
+                              )}
+                            >
+                              {ar}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <AutoTextarea
+                        value={newFigPrompt}
+                        onChange={setNewFigPrompt}
+                        placeholder="描述画面主体与分屏对比细节…"
+                        minRows={2}
+                        className="font-mono text-xs"
+                      />
+                      {activeVisualPreset && !newFigPrompt.includes(activeVisualPreset.promptPrefix) && (
+                        <button
+                          type="button"
+                          onClick={() => setNewFigPrompt(`${activeVisualPreset.promptPrefix}. ${(newFigPrompt || newFigIntent).trim()}`.trim())}
+                          className="text-[11px] text-violet-700 hover:underline dark:text-violet-300"
+                        >
+                          + 注入「{activeVisualPreset.name}」画风前缀
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <input
+                    value={newFigAnchor}
+                    onChange={(e) => setNewFigAnchor(e.target.value)}
+                    placeholder="图文联动契约（可选）：图画好后，本块哪句啰嗦话可以删掉？"
+                    className={clsx(inputClass, "text-xs")}
+                  />
+                  <button
+                    type="button"
+                    disabled={!newFigIntent.trim()}
+                    onClick={addFigureRequest}
+                    className={clsx(buttonClass("secondary", "sm"), "w-full justify-center")}
+                  >
+                    <Plus className="size-3.5 text-sky-600" /> 加入本块配图需求清单
+                  </button>
+                </div>
+
+                {figureRequests.length > 0 && (
+                  <ul className="mt-3 space-y-1.5 border-t border-stone-100 pt-2.5 dark:border-stone-800">
+                    {figureRequests.map((req) => (
+                      <li key={req.id} className="flex items-start justify-between gap-2 rounded bg-sky-50/60 p-2 dark:bg-sky-950/30">
+                        <div>
+                          <div className="font-mono font-semibold text-sky-800 dark:text-sky-200">
+                            {req.id} · {req.role} ({req.kind})
+                          </div>
+                          <div className="text-stone-600 dark:text-stone-300">{req.intent}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDraft((d) => ({
+                              ...d,
+                              figureIds: (d.figureIds ?? []).filter((id) => id !== req.id),
+                              figureRequests: (d.figureRequests ?? []).filter((r) => r.id !== req.id),
+                            }))
+                          }
+                          className="text-stone-400 hover:text-rose-600"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             </div>
           )}
 
@@ -504,16 +840,20 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
       <ActionBar
         note={draft.note}
         onNote={(note) => setDraft((d) => ({ ...d, note }))}
-        status={edited ? `你改了 ${cards.length || "若干"} 处，提交时会写进 blocks/${input.blockId}.md` : "还没有修改"}
+        status={
+          edited || figuresChanged
+            ? `你改了 ${cards.length || "若干"} 处${figureRequests.length ? `，新增 ${figureRequests.length} 项配图需求` : ""}，提交时会写进 blocks/${input.blockId}.md`
+            : "还没有修改"
+        }
         onAction={onAction}
         actions={[
           { id: "later", label: "稍后再说", icon: <Clock className="size-4" />, variant: "ghost" },
           {
             id: "revise",
-            label: "按批注修改",
+            label: figureRequests.length ? "按批注与配图需求修改" : "按批注修改",
             icon: <Send className="size-4" />,
             disabled: !canRevise,
-            hint: canRevise ? "把修订和批注交给 agent，只改这一块" : "先改字、加批注或写整体意见",
+            hint: canRevise ? "把修订、批注和配图需求交给 agent，生图并精简这一块" : "先改字、加批注、提配图需求或写整体意见",
           },
           {
             id: "accept",

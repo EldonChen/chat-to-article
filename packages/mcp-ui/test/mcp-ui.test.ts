@@ -254,14 +254,113 @@ test("review_figure writes the source on call and records the decision", () => {
   const raw = input("review_figure");
   const session = manager.create("review_figure", raw);
   assert.equal(readFileSync(join(article, "figures", "fig-flow.mmd"), "utf8").trim(), (raw.source as string).trim());
+  const ctx = session.prepared.context as { linkedBlocks?: { id: string; body: string }[]; figure?: { role?: string; intent?: string } };
+  assert.equal(ctx.linkedBlocks?.[0]?.id, "b002");
+  assert.equal(ctx.figure?.role, "mechanism");
+
   const source = "flowchart LR\n  a --> b\n";
-  const out = manager.submit(session.id, { decision: "accept", source, caption: "图注", alt: "替代文字" });
+  const out = manager.submit(session.id, {
+    decision: "accept",
+    source,
+    caption: "图注",
+    alt: "替代文字",
+    role: "comparison",
+    intent: "对比全文重写与单块修订",
+    takeaway: "单块隔离避免返工",
+    anchorSummary: "左列全文重写，右列单块修订",
+    markBlocksStale: true,
+    textSyncNote: "图改成了左右对比，请删掉 b002 里原先按四步流转写的句子",
+  });
   assert.ok(out.ok);
+  assert.match(out.response, /stale：b002/);
+  assert.match(out.response, /图文联动修改意见/);
   assert.equal(readFileSync(join(article, "figures", "fig-flow.mmd"), "utf8"), source);
-  const manifest = JSON.parse(readFileSync(join(article, "figures", "manifest.json"), "utf8")) as { figures: { id: string; status: string; caption: string }[] };
+  const manifest = JSON.parse(readFileSync(join(article, "figures", "manifest.json"), "utf8")) as {
+    figures: { id: string; status: string; caption: string; role?: string; takeaway?: string; anchorSummary?: string }[];
+  };
   const fig = manifest.figures.find((f) => f.id === "fig-flow")!;
   assert.equal(fig.status, "accepted");
   assert.equal(fig.caption, "图注");
+  assert.equal(fig.role, "comparison");
+  assert.equal(fig.takeaway, "单块隔离避免返工");
+  assert.equal(fig.anchorSummary, "左列全文重写，右列单块修订");
+  const b002 = parseBlock(readFileSync(join(article, "blocks", "b002.md"), "utf8"));
+  assert.equal(b002.meta.status, "stale", "linked block b002 is marked stale when figure changes require text sync");
+});
+
+test("review_block exposes attached figures and persists inline raster figureRequests with confirmed authorization", () => {
+  const { article, manager, input } = setup();
+  const session = manager.create("review_block", {
+    ...input("review_block"),
+    blockId: "b002",
+    body: "结构图用 Mermaid 源文件保存。",
+  });
+  const ctx = session.prepared.context as { figures?: { id: string; role?: string }[] };
+  assert.equal(ctx.figures?.[0]?.id, "fig-flow");
+  assert.equal(ctx.figures?.[0]?.role, "mechanism");
+
+  const out = manager.submit(session.id, {
+    decision: "revise",
+    finalBody: "结构图用 Mermaid 源文件保存。",
+    changes: [],
+    comments: [],
+    figureIds: ["fig-flow", "fig-b002-1"],
+    figureRequests: [
+      {
+        id: "fig-b002-1",
+        kind: "raster",
+        role: "comparison",
+        intent: "新增一张左右分屏对比图展示全文重写 vs 单块手术台",
+        takeaway: "只递单块上手术台才能从物理上杜绝越界改写",
+        prompt: "Modern tech explainer split-screen comparison illustration: left cluttered desk, right isolated block surgery",
+        aspectRatio: "16:9",
+      },
+    ],
+  });
+  assert.ok(out.ok);
+  assert.match(out.response, /fig-b002-1/);
+  assert.match(out.response, /GenerateImage/);
+  const savedBlock = parseBlock(readFileSync(join(article, "blocks", "b002.md"), "utf8"));
+  assert.deepEqual(savedBlock.meta.figureIds, ["fig-flow", "fig-b002-1"]);
+  const manifest = JSON.parse(readFileSync(join(article, "figures", "manifest.json"), "utf8")) as {
+    figures: { id: string; kind: string; role?: string; prompt?: string; aspectRatio?: string; confirmed?: boolean; status: string; blockIds?: string[] }[];
+  };
+  const added = manifest.figures.find((f) => f.id === "fig-b002-1")!;
+  assert.ok(added);
+  assert.equal(added.kind, "raster");
+  assert.equal(added.confirmed, true);
+  assert.equal(added.aspectRatio, "16:9");
+  assert.ok(added.prompt?.includes("split-screen"));
+  assert.ok(added.blockIds?.includes("b002"));
+
+  // Verify review_figure with raster image file encodes imageDataUrl and supports prompt refinement
+  writeFileSync(join(article, "figures", "fig-b002-1.png"), Buffer.from("fake-png-bytes"));
+  const figSession = manager.create("review_figure", {
+    article,
+    figureId: "fig-b002-1",
+    kind: "raster",
+    role: "comparison",
+    source: "figures/fig-b002-1.png",
+    prompt: added.prompt,
+    aspectRatio: "16:9",
+    caption: "左右分屏对比",
+    alt: "分屏对比插图",
+    blockIds: ["b002"],
+  });
+  const figCtx = figSession.prepared.context as { imageDataUrl?: string | null };
+  assert.ok(figCtx.imageDataUrl?.startsWith("data:image/png;base64,"));
+  const figRevise = manager.submit(figSession.id, {
+    decision: "revise",
+    source: "figures/fig-b002-1.png",
+    caption: "左右分屏对比",
+    alt: "分屏对比插图",
+    prompt: "Updated prompt with emerald highlight",
+    aspectRatio: "4:3",
+    referenceImages: [join(article, "figures", "fig-b002-1.png")],
+  });
+  assert.ok(figRevise.ok);
+  assert.match(figRevise.response, /GenerateImage/);
+  assert.match(figRevise.response, /reference_image_paths/);
 });
 
 type ToolResult = { content: { type: string; text: string }[]; structuredContent?: Record<string, unknown>; isError?: boolean };

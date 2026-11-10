@@ -57,6 +57,37 @@ const DEFAULT_APPROACH_OPTIONS = [
   },
 ];
 
+export const VISUAL_STYLE_PRESETS: { id: string; name: string; summary: string; promptPrefix: string }[] = [
+  {
+    id: "tech-spotlight",
+    name: "现代科技解构风（极客聚光灯）",
+    summary: "高对比度立体轴测或半扁平科技图解，翡翠绿（高效/新设计）与珊瑚红（瓶颈/笨办法）聚焦信号色，适合科技博主硬核科普。",
+    promptPrefix:
+      "Modern tech explainer illustration, clean studio background, high-contrast isometric cutaway or flat-vector diagram, emerald green (#16A36A) for optimized path and coral red (#E11D48) for bottleneck, sharp focus, minimalist geometric labels, no gibberish text",
+  },
+  {
+    id: "whiteboard-sketch",
+    name: "毕导式手绘白板风",
+    summary: "暖白纸张底色 + 黑色马克笔手绘线条 + 荧光黄局部高亮，配简笔图标与直观物理隐喻，轻松好懂。",
+    promptPrefix:
+      "Hand-drawn whiteboard sketchnote illustration on warm off-white paper (#FAF8F5), clean black marker lines with yellow and mint highlighter accents, witty stick-figure or physics metaphor, educational and approachable, no messy background",
+  },
+  {
+    id: "editorial-comic",
+    name: "差评式科技条漫/杂志插画风",
+    summary: "支持 2–4 格拟人分镜条漫、系统组件角色化表情动作与戏剧化反差场景，故事感强。",
+    promptPrefix:
+      "Editorial tech magazine illustration or 2-to-4 panel comic strip, expressive anthropomorphized system characters, bold graphic composition, vibrant cobalt blue and warm orange palette, clear visual storytelling, minimal text",
+  },
+  {
+    id: "minimal-blueprint",
+    name: "极简工程蓝图风",
+    summary: "克制的等距线框与石色/靛蓝单色系，无多余装饰背景，强调系统边界框与数据流向。",
+    promptPrefix:
+      "Minimalist engineering blueprint diagram, clean architectural wireframe on light slate grid, monochrome indigo and stone palette with single amber highlight, precise technical layout, no decorative clutter",
+  },
+];
+
 const INTENT_LABELS: { id: string; label: string; tone: "amber" | "blue" | "violet" | "green" }[] = [
   { id: "trigger", label: "初始困惑", tone: "amber" },
   { id: "probe", label: "深入追问", tone: "blue" },
@@ -540,6 +571,75 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
                 {showAllAxes ? "收起次要风格维度" : `展开其余 ${allAxisIds.length - visibleAxisIds.length} 项风格微调（可选）`}
               </button>
             ) : null}
+          </Card>
+
+          <Card
+            title="第五步：全篇视觉配图画风（多模态生图与图表调性统一）"
+            actions={<span className="text-xs text-stone-400">锁定全篇插图画风；首张确认的插图将自动作为后续生图的参考垫图</span>}
+          >
+            <div className="grid gap-2 @md:grid-cols-2">
+              {VISUAL_STYLE_PRESETS.map((vs) => {
+                const on = plan.visualStyle?.id === vs.id;
+                return (
+                  <button
+                    key={vs.id}
+                    type="button"
+                    onClick={() =>
+                      setPlan({
+                        visualStyle: on
+                          ? undefined
+                          : { id: vs.id, name: vs.name, note: vs.summary, referenceImage: plan.visualStyle?.referenceImage },
+                      })
+                    }
+                    className={clsx(
+                      "rounded-lg border p-3 text-left text-xs transition",
+                      on
+                        ? "border-emerald-400 bg-emerald-50/70 dark:border-emerald-700 dark:bg-emerald-950/40"
+                        : "border-stone-200 hover:border-stone-300 dark:border-stone-700",
+                    )}
+                  >
+                    <div className="flex items-center justify-between font-medium text-stone-800 dark:text-stone-100">
+                      <span>{vs.name}</span>
+                      <span className="font-mono text-[11px] text-stone-400">{vs.id}</span>
+                    </div>
+                    <p className="mt-1 leading-relaxed text-stone-500 dark:text-stone-400">{vs.summary}</p>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 grid gap-2 @md:grid-cols-2">
+              <input
+                value={plan.visualStyle?.note ?? ""}
+                onChange={(e) =>
+                  setPlan({
+                    visualStyle: {
+                      id: plan.visualStyle?.id || "custom",
+                      name: plan.visualStyle?.name || "自定义视觉画风",
+                      note: e.target.value,
+                      referenceImage: plan.visualStyle?.referenceImage,
+                    },
+                  })
+                }
+                placeholder="补充视觉画风要求（可选，如：统一用暖色白底、左红右绿分屏对比）"
+                className={clsx(inputClass, "text-xs")}
+              />
+              <input
+                value={plan.visualStyle?.referenceImage ?? ""}
+                onChange={(e) =>
+                  setPlan({
+                    visualStyle: {
+                      id: plan.visualStyle?.id || "tech-spotlight",
+                      name: plan.visualStyle?.name,
+                      note: plan.visualStyle?.note,
+                      referenceImage: e.target.value,
+                    },
+                  })
+                }
+                placeholder="画风参考垫图路径（可选，传入 GenerateImage 的 reference_image_paths）"
+                className={clsx(inputClass, "font-mono text-xs")}
+              />
+            </div>
+            {comment("visualStyle")}
           </Card>
 
           <Card title="待定问题（不阻碍开写，可在后续阶段决定）">

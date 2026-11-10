@@ -42,6 +42,7 @@ export interface WritingPlan {
   openQuestions: string[];
   motivation?: WritingMotivation;
   voice?: { id: string; name?: string; note?: string };
+  visualStyle?: { id: string; name?: string; note?: string; referenceImage?: string };
 }
 
 export type ClaimStatus = "candidate" | "accepted" | "rejected" | "disputed";
@@ -81,15 +82,22 @@ export interface Outline {
 }
 
 export type FigureKind = "mermaid" | "drawio" | "svg-chart" | "raster" | "remote";
+export type VisualRole = "hook" | "analogy" | "comparison" | "mechanism" | "evidence" | "architecture";
 
 export interface Figure {
   id: string;
   kind: FigureKind | string;
   status: "planned" | "drafted" | "accepted" | string;
+  role?: VisualRole | string;
+  intent?: string;
+  takeaway?: string;
+  anchorSummary?: string;
   caption?: string;
   alt?: string;
   source?: string;
   prompt?: string;
+  aspectRatio?: "1:1" | "4:3" | "3:4" | "16:9" | "9:16" | string;
+  referenceImages?: string[];
   license?: string;
   confirmed?: boolean;
   blockIds?: string[];
@@ -212,11 +220,20 @@ export interface Candidate {
 export interface StylePreset {
   id: string;
   name: string;
+  defaultVisualStyle?: string;
   fits: string[];
   summary: string;
   traits: string[];
   avoid: string[];
   sample: string;
+}
+
+export interface VisualStylePreset {
+  id: string;
+  name: string;
+  fits: string[];
+  summary: string;
+  promptPrefix: string;
 }
 
 export interface VoiceSnapshot {
@@ -228,6 +245,7 @@ export interface VoiceSnapshot {
   exemplars: { ref: string; content: string; referenced: boolean }[];
   candidates: Candidate[];
   presets?: StylePreset[];
+  visualStyles?: VisualStylePreset[];
   errors: string[];
 }
 

@@ -80,6 +80,7 @@ export function VoicePage() {
   if (error) return <ErrorBox error={error} />;
   if (isLoading || !data) return <Loading />;
   const presets = data.presets ?? [];
+  const visualStyles = data.visualStyles ?? [];
   if (!data.exists && tab !== "presets")
     return (
       <>
@@ -273,55 +274,95 @@ export function VoicePage() {
 
         {current === "presets" &&
           (presets.length ? (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {presets.map((preset) => (
-                <Card
-                  key={preset.id}
-                  title={
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span>{preset.name}</span>
-                      <span className="font-mono text-xs font-normal text-stone-400">{preset.id}</span>
-                    </span>
-                  }
-                  actions={
-                    <div className="flex flex-wrap gap-1">
-                      {preset.fits.map((f) => (
-                        <Tag key={f}>{f}</Tag>
-                      ))}
-                    </div>
-                  }
-                >
-                  <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{preset.summary}</p>
-                  <div className="mt-3 space-y-2 text-xs">
-                    <div>
-                      <div className="mb-1 font-medium text-emerald-700 dark:text-emerald-400">核心特征</div>
-                      <ul className="list-disc space-y-1 pl-4 text-stone-600 dark:text-stone-300">
-                        {preset.traits.map((t, i) => (
-                          <li key={i}>{t}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    {preset.avoid.length > 0 && (
-                      <div>
-                        <div className="mb-1 font-medium text-rose-700 dark:text-rose-400">主动避开</div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {preset.avoid.map((a, i) => (
-                            <span key={i} className="rounded bg-rose-50 px-2 py-0.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
-                              {a}
-                            </span>
+            <div className="space-y-8">
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-stone-700 dark:text-stone-200">文字笔调预设（{presets.length}）</h3>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {presets.map((preset) => (
+                    <Card
+                      key={preset.id}
+                      title={
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span>{preset.name}</span>
+                          <span className="font-mono text-xs font-normal text-stone-400">{preset.id}</span>
+                          {preset.defaultVisualStyle && <Tag>配图画风：{preset.defaultVisualStyle}</Tag>}
+                        </span>
+                      }
+                      actions={
+                        <div className="flex flex-wrap gap-1">
+                          {preset.fits.map((f) => (
+                            <Tag key={f}>{f}</Tag>
                           ))}
                         </div>
+                      }
+                    >
+                      <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{preset.summary}</p>
+                      <div className="mt-3 space-y-2 text-xs">
+                        <div>
+                          <div className="mb-1 font-medium text-emerald-700 dark:text-emerald-400">核心特征</div>
+                          <ul className="list-disc space-y-1 pl-4 text-stone-600 dark:text-stone-300">
+                            {preset.traits.map((t, i) => (
+                              <li key={i}>{t}</li>
+                            ))}
+                          </ul>
+                        </div>
+                        {preset.avoid.length > 0 && (
+                          <div>
+                            <div className="mb-1 font-medium text-rose-700 dark:text-rose-400">主动避开</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {preset.avoid.map((a, i) => (
+                                <span key={i} className="rounded bg-rose-50 px-2 py-0.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                                  {a}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="pt-1">
+                          <div className="mb-1 font-medium text-stone-500">对照样稿</div>
+                          <div className="whitespace-pre-wrap rounded-lg border border-stone-200/80 bg-stone-50/70 p-3 font-serif text-xs leading-6 text-stone-700 dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-200">
+                            {preset.sample}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div className="pt-1">
-                      <div className="mb-1 font-medium text-stone-500">对照样稿</div>
-                      <div className="whitespace-pre-wrap rounded-lg border border-stone-200/80 bg-stone-50/70 p-3 font-serif text-xs leading-6 text-stone-700 dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-200">
-                        {preset.sample}
-                      </div>
-                    </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {visualStyles.length > 0 && (
+                <div>
+                  <h3 className="mb-3 text-sm font-semibold text-stone-700 dark:text-stone-200">多模态视觉配图画风预设（{visualStyles.length}）</h3>
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {visualStyles.map((vs) => (
+                      <Card
+                        key={vs.id}
+                        title={
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span>{vs.name}</span>
+                            <span className="font-mono text-xs font-normal text-stone-400">{vs.id}</span>
+                          </span>
+                        }
+                        actions={
+                          <div className="flex flex-wrap gap-1">
+                            {vs.fits.map((f) => (
+                              <Tag key={f}>{f}</Tag>
+                            ))}
+                          </div>
+                        }
+                      >
+                        <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{vs.summary}</p>
+                        <div className="mt-3">
+                          <div className="mb-1 text-xs font-medium text-stone-500">生图风格前缀（Prompt Prefix）</div>
+                          <pre className="whitespace-pre-wrap rounded-lg bg-stone-50 p-2.5 font-mono text-[11px] leading-relaxed text-stone-600 dark:bg-stone-800/60 dark:text-stone-300">
+                            {vs.promptPrefix}
+                          </pre>
+                        </div>
+                      </Card>
+                    ))}
                   </div>
-                </Card>
-              ))}
+                </div>
+              )}
             </div>
           ) : (
             <Empty title="未找到内置风格预设" />

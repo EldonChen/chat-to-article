@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import {
   appendJsonl,
   compileLexicon,
@@ -10,6 +10,8 @@ import {
   loadFigures,
   loadOutline,
   loadSharedLexicon,
+  loadStylePresets,
+  loadVisualStylePresets,
   loadVoice,
   readJson,
   readJsonl,
@@ -26,7 +28,7 @@ import {
   type Section,
   type WritingPlan,
 } from "@liem-opc/chat-to-article-core";
-import type { LexiconRuleWire } from "../shared/actions.ts";
+import type { BlockFigureWire, LexiconRuleWire } from "../shared/actions.ts";
 
 export const SOURCE_TAG = "mcp-ui";
 
@@ -159,7 +161,7 @@ export function writeBlockDraft(
   return { previousBody, changed: true };
 }
 
-/** 记录本篇选定的笔调（写入 writing-plan.json 的 voice 字段及 preferences.jsonl）。 */
+/** 记录本篇选定的笔调（写入 writing-plan.json 的 voice 字段及 preferences.jsonl），若尚未设置 visualStyle 则联动关联默认视觉画风。 */
 export function saveSelectedVoice(dir: string, voiceId: string, label: string, note: string, blockId: string): void {
   const planPath = join(dir, "writing-plan.json");
   const plan = readJson<WritingPlan>(planPath) ?? ({
@@ -172,6 +174,16 @@ export function saveSelectedVoice(dir: string, voiceId: string, label: string, n
     openQuestions: [],
   } as WritingPlan);
   plan.voice = { id: voiceId, name: label, ...(note ? { note } : {}) };
+  if (!plan.visualStyle) {
+    const skill = findSkillDir(existsSync(dir) ? dir : dirname(dir)).dir;
+    const preset = loadStylePresets(skill).find((p) => p.id === voiceId);
+    if (preset?.defaultVisualStyle) {
+      const vStyle = loadVisualStylePresets(skill).find((v) => v.id === preset.defaultVisualStyle);
+      plan.visualStyle = vStyle
+        ? { id: vStyle.id, name: vStyle.name, note: vStyle.summary }
+        : { id: preset.defaultVisualStyle };
+    }
+  }
   writeJson(planPath, plan);
 
   const prefsPath = join(dir, "preferences.jsonl");
@@ -391,20 +403,138 @@ export function upsertFigures(dir: string, figures: Partial<Figure>[]): void {
     if (!fig.id) continue;
     const idx = list.findIndex((f) => f.id === fig.id);
     if (idx >= 0) list[idx] = { ...list[idx], ...stripUndefined(fig) } as Figure;
-    else
+    else {
+      const kind = fig.kind ?? "mermaid";
+      const ext = kind === "svg-chart" ? "svg" : kind === "drawio" ? "drawio" : kind === "raster" || kind === "remote" ? "png" : "mmd";
       list.push({
         id: fig.id,
-        kind: fig.kind ?? "mermaid",
+        kind,
         status: fig.status ?? "planned",
+        ...(fig.role ? { role: fig.role } : {}),
+        ...(fig.intent ? { intent: fig.intent } : {}),
+        ...(fig.takeaway ? { takeaway: fig.takeaway } : {}),
+        ...(fig.anchorSummary ? { anchorSummary: fig.anchorSummary } : {}),
         caption: fig.caption ?? "",
         alt: fig.alt ?? "",
-        source: fig.source ?? `figures/${fig.id}.mmd`,
+        source: fig.source ?? `figures/${fig.id}.${ext}`,
         prompt: fig.prompt ?? "",
+        ...(fig.aspectRatio ? { aspectRatio: fig.aspectRatio } : {}),
+        ...(fig.referenceImages?.length ? { referenceImages: fig.referenceImages } : {}),
+        ...(fig.confirmed != null ? { confirmed: fig.confirmed } : kind === "raster" ? { confirmed: true } : {}),
         license: fig.license ?? "",
         blockIds: fig.blockIds ?? [],
       });
+    }
   }
   writeJson(join(dir, "figures", "manifest.json"), { figures: list });
+}
+
+const IMAGE_MIMES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+};
+
+/** 读取本地图片文件（raster / remote / drawio 的 .svg）并转为 Data URL，供内嵌审阅视图直接渲染。 */
+export function readFigureDataUrl(dir: string, fig: Pick<Figure, "kind" | "source">): string | null {
+  if (!fig.source) return null;
+  const candidateRel = fig.kind === "drawio" ? fig.source.replace(/\.[^./]+$/, ".svg") : fig.source;
+  const full = join(dir, candidateRel);
+  try {
+    if (!existsSync(full) || !statSync(full).isFile()) return null;
+    const ext = extname(full).toLowerCase();
+    const mime = IMAGE_MIMES[ext];
+    if (!mime) return null;
+    const buf = readFileSync(full);
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/** 查找本篇可用于 reference_image_paths 画风传承的锚点图（优先 writing-plan.visualStyle.referenceImage，其次首张已存在的 raster 图）。 */
+export function findStyleAnchorImage(dir: string, excludeFigureId?: string): string | null {
+  const plan = readJson<WritingPlan>(join(dir, "writing-plan.json"));
+  if (plan?.visualStyle?.referenceImage?.trim()) return plan.visualStyle.referenceImage.trim();
+  for (const fig of loadFigures(dir)) {
+    if (fig.id === excludeFigureId) continue;
+    if (fig.kind === "raster" && fig.source) {
+      const full = join(dir, fig.source);
+      if (existsSync(full)) return full;
+    }
+  }
+  return null;
+}
+
+/** 同步某张图与正文块的双向绑定关系（figures/manifest.json 的 blockIds 与 blocks/<id>.md 的 figureIds）。 */
+export function syncFigureBlockBindings(dir: string, figureId: string, targetBlockIds: string[]): void {
+  const want = new Set(targetBlockIds);
+  for (const blockId of outlineBlockIds(dir)) {
+    const block = loadBlock(dir, blockId);
+    if (!block.exists || !block.meta) continue;
+    const current = block.meta.figureIds ?? [];
+    const has = current.includes(figureId);
+    if (want.has(blockId) && !has) {
+      writeText(
+        join(dir, "blocks", `${blockId}.md`),
+        formatBlock({ ...block.meta, figureIds: [...current, figureId] }, block.body),
+      );
+    } else if (!want.has(blockId) && has) {
+      writeText(
+        join(dir, "blocks", `${blockId}.md`),
+        formatBlock({ ...block.meta, figureIds: current.filter((id) => id !== figureId) }, block.body),
+      );
+    }
+  }
+}
+
+/** 当图片结构、视觉隐喻或核心结论变更且需同步修文时，将关联的正文块置为 stale。 */
+export function invalidateBlocksByFigure(dir: string, figureId: string, explicitBlockIds?: string[]): string[] {
+  const stale: string[] = [];
+  const targetSet = new Set(explicitBlockIds ?? []);
+  for (const blockId of outlineBlockIds(dir)) {
+    const block = loadBlock(dir, blockId);
+    if (!block.exists || !block.meta) continue;
+    const usesFig = (block.meta.figureIds ?? []).includes(figureId) || targetSet.has(blockId);
+    if (!usesFig) continue;
+    if (block.meta.status === "stale") continue;
+    writeText(join(dir, "blocks", `${blockId}.md`), formatBlock({ ...block.meta, status: "stale" }, block.body));
+    stale.push(blockId);
+  }
+  return stale;
+}
+
+export function loadBlockFigures(dir: string, blockId: string): { figures: BlockFigureWire[]; availableFigures: BlockFigureWire[] } {
+  const block = loadBlock(dir, blockId);
+  const all = loadFigures(dir);
+  const attachedIds = new Set<string>(block.meta?.figureIds ?? []);
+  for (const f of all) {
+    if ((f.blockIds ?? []).includes(blockId)) attachedIds.add(f.id);
+  }
+  const toWire = (f: Figure): BlockFigureWire => ({
+    id: f.id,
+    kind: f.kind,
+    status: f.status,
+    role: f.role,
+    intent: f.intent,
+    takeaway: f.takeaway,
+    anchorSummary: f.anchorSummary,
+    caption: f.caption,
+    alt: f.alt,
+    source: f.source,
+    prompt: f.prompt,
+    aspectRatio: f.aspectRatio,
+    referenceImages: f.referenceImages,
+    confirmed: f.confirmed,
+    content: (f.kind === "mermaid" || f.kind === "svg-chart") && f.source ? readFigureSource(dir, f.source) : null,
+    imageDataUrl: f.kind === "raster" || f.kind === "remote" || f.kind === "drawio" ? readFigureDataUrl(dir, f) : null,
+  });
+  const availableFigures = all.map(toWire);
+  const figures = availableFigures.filter((f) => attachedIds.has(f.id));
+  return { figures, availableFigures };
 }
 
 function stripUndefined<T extends object>(obj: T): Partial<T> {

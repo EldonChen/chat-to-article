@@ -1,9 +1,10 @@
 {
-  "note": "内置笔调。每个笔调的 sample 写的是同一件事，方便作者对比差别。起草多版时，挑和本篇文体相容、彼此差别明显的几个。",
+  "note": "内置笔调与视觉画风预设。每个笔调的 sample 写的是同一件事，方便作者对比差别；每个笔调默认关联一套 visualStyle，保证图文调性统一。",
   "presets": [
     {
       "id": "colleague",
       "name": "跟同事复盘",
+      "defaultVisualStyle": "minimal-blueprint",
       "fits": ["工程实践", "复盘", "经验分享"],
       "summary": "第一人称，像在工位旁边给懂行的同事讲这件事：当时怎么想的、哪里踩了坑、后来怎么改。",
       "traits": [
@@ -18,6 +19,7 @@
     {
       "id": "engineering",
       "name": "工程笔记",
+      "defaultVisualStyle": "minimal-blueprint",
       "fits": ["技术方案", "架构决策", "故障复盘", "参考文档"],
       "summary": "结论先行，信息密度高。每一段讲清一个决定、它的理由和适用边界，少形容词。",
       "traits": [
@@ -32,6 +34,7 @@
     {
       "id": "essay",
       "name": "随笔",
+      "defaultVisualStyle": "whiteboard-sketch",
       "fits": ["个人思考", "人文社科", "专栏"],
       "summary": "从一个具体场景或细节进入，思路有起伏，允许自问自答和个人感受，结尾留一个想法而不是总结。",
       "traits": [
@@ -46,6 +49,7 @@
     {
       "id": "explainer",
       "name": "讲解",
+      "defaultVisualStyle": "whiteboard-sketch",
       "fits": ["科普", "教程", "面向新手的解释"],
       "summary": "从读者可能的疑问出发，用一个贴切的类比先给直觉，再讲精确的说法，每个新概念都配例子。",
       "traits": [
@@ -60,6 +64,7 @@
     {
       "id": "opinion",
       "name": "观点评论",
+      "defaultVisualStyle": "editorial-comic",
       "fits": ["论证", "评论", "设计论证"],
       "summary": "开头亮出判断，用例证而不是排比支撑，正面回应最强的反对意见，语气笃定但标出边界。",
       "traits": [
@@ -74,6 +79,7 @@
     {
       "id": "narrative",
       "name": "叙事纪实",
+      "defaultVisualStyle": "editorial-comic",
       "fits": ["回忆", "纪实", "项目故事"],
       "summary": "按时间推进，有场景、人物和动作，判断藏在细节里，少用抽象词。",
       "traits": [
@@ -88,6 +94,7 @@
     {
       "id": "tech-blogger",
       "name": "科技博主科普",
+      "defaultVisualStyle": "tech-spotlight",
       "fits": ["硬核科普", "技术解读", "科技自媒体", "工程故事"],
       "summary": "把高深枯燥的技术问题包装成普通人迫切想知道答案的悬念或故事：用熟悉场景或反常识冲突抓人，先推演直觉「笨办法」为何撞墙，再借生活类比与真实机制分层揭秘，持续给出「原来如此」的认知爽感。",
       "traits": [
@@ -104,6 +111,36 @@
         "为博眼球夸大事实数字，或让段子喧宾夺主"
       ],
       "sample": "让 AI 帮你改一篇文章里的一句话，为什么往往比自己重写整篇还要累？你明明只让它把第三段改顺一点，结果三秒后稿子回来，开头埋的伏笔、中间攒了半天的数据例子全被顺手「优化」没了——你不得不对着两份三千字的稿子玩大家来找茬。\n\n你可能会想：在提示词里千叮万嘱「不准改别处」不就行了？真没用。只要把整篇文章一股脑塞进上下文，模型生成时就等于把全文重新抄写一遍。与其在提示词里求它手下留情，不如直接从物理上没收它的修改权：把正文拆成独立的块文件，改哪段就只把那一块递上手术台，前后两段隔着玻璃只许看、不许摸。"
+    }
+  ],
+  "visualStyles": [
+    {
+      "id": "tech-spotlight",
+      "name": "现代科技解构风（极客聚光灯）",
+      "fits": ["tech-blogger", "硬核科普", "机制拆解"],
+      "summary": "高对比度立体轴测或半扁平科技图解，使用翡翠绿（高效/新设计）与珊瑚红/琥珀黄（瓶颈/笨办法）作为聚焦信号色，弱化次要背景节点。",
+      "promptPrefix": "Modern tech explainer illustration, clean studio background, high-contrast isometric cutaway or flat-vector diagram, emerald green (#16A36A) for optimized path and coral red (#E11D48) for bottleneck, sharp focus, minimalist geometric labels, no gibberish text"
+    },
+    {
+      "id": "whiteboard-sketch",
+      "name": "毕导式手绘白板风",
+      "fits": ["explainer", "essay", "生活类比", "原理推导"],
+      "summary": "暖白纸张底色，黑色马克笔手绘线条配荧光黄/薄荷绿局部高亮，包含简笔图标、问号气泡与直观物理隐喻，具有推演亲和力。",
+      "promptPrefix": "Hand-drawn whiteboard sketchnote illustration on warm off-white paper (#FAF8F5), clean black marker lines with yellow and mint highlighter accents, witty stick-figure or physics metaphor, educational and approachable, no messy background"
+    },
+    {
+      "id": "editorial-comic",
+      "name": "差评式科技条漫/杂志插画风",
+      "fits": ["opinion", "narrative", "拟人小剧场", "产业故事"],
+      "summary": "鲜明的科技媒体插画感，支持 2–4 格分镜条漫、系统组件拟人化表情动作与戏剧化冲突反差场景。",
+      "promptPrefix": "Editorial tech magazine illustration or 2-to-4 panel comic strip, expressive anthropomorphized system characters, bold graphic composition, vibrant cobalt blue and warm orange palette, clear visual storytelling, minimal text"
+    },
+    {
+      "id": "minimal-blueprint",
+      "name": "极简工程蓝图风",
+      "fits": ["engineering", "colleague", "架构拓扑", "方案复盘"],
+      "summary": "克制的等距线框与石色/靛蓝单色系，无多余装饰背景，强调系统边界框、模块分层与数据流向。",
+      "promptPrefix": "Minimalist engineering blueprint diagram, clean architectural wireframe on light slate grid, monochrome indigo and stone palette with single amber highlight, precise technical layout, no decorative clutter"
     }
   ]
 }
