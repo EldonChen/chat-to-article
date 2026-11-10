@@ -25,7 +25,7 @@ import {
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BlockContext, BlockFigureRequest, ReviewBlockInput, ReviewBlockResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
-import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
+import { ExpressChrome, SectionTweaks, appendChipNote, chipPlay, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { Mermaid } from "../components/Mermaid.tsx";
 import { TextDiff, textChanges } from "../components/TextDiff.tsx";
 import { AutoTextarea, Badge, buttonClass, inputClass, Tag, useDarkMode } from "../components/ui.tsx";
@@ -157,6 +157,8 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
   const [newFigAspectRatio, setNewFigAspectRatio] = useState<string>("16:9");
   const [express, setExpress] = useState(true);
   const [chips, setChips] = useState<string[]>([]);
+  const [sectionIndex, setSectionIndex] = useState(0);
+  const [sectionPreview, setSectionPreview] = useState("");
 
   const paperRef = useRef<HTMLDivElement>(null);
   const commentInputs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -288,8 +290,30 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
         hook={context.cognitiveRole || "看不懂就点上面的芯片，不必先划词"}
         structure={input.blockId}
         chips={chips}
-        onChip={(id) => setChips((list) => toggleChip(list, id))}
+        onChip={(id) => {
+          const turningOn = !chips.includes(id);
+          setChips((list) => toggleChip(list, id));
+          const play = chipPlay(id);
+          if (turningOn && play) setDraft((current) => ({ ...current, note: appendChipNote(current.note, play) }));
+        }}
       />
+      {express && (
+        <div className="mx-auto max-w-3xl px-4 pt-4">
+          <SectionTweaks
+            paragraphs={paragraphs}
+            active={sectionIndex}
+            onSelect={setSectionIndex}
+            onChip={(id) => {
+              const play = chipPlay(id);
+              if (!play) return;
+              const where = `第${sectionIndex + 1}段`;
+              setDraft((current) => ({ ...current, note: appendChipNote(current.note, play, where) }));
+              setSectionPreview(`${where} · ${play.label}：${play.preview}`);
+            }}
+            preview={sectionPreview}
+          />
+        </div>
+      )}
       <div className={clsx("mx-auto grid max-w-7xl gap-6 px-4 py-4", !express && "@4xl:grid-cols-[minmax(0,1fr)_23rem]")}>
         <div className="min-w-0 space-y-4">
           {input.instruction && (

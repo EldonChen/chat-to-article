@@ -11,7 +11,7 @@ import type {
   WritingPlanFields,
 } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
-import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
+import { ExpressChrome, appendChipNote, chipPlay, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { AutoTextarea, Badge, buttonClass, Card, FieldComment, inputClass } from "../components/ui.tsx";
 import { useDraft } from "../store.ts";
 import type { SubmitFn } from "./types.ts";
@@ -201,7 +201,12 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
         hook={motivation.initialConfusion}
         structure={plan.approach}
         chips={chips}
-        onChip={(id) => setChips((list) => toggleChip(list, id))}
+        onChip={(id) => {
+          const turningOn = !chips.includes(id);
+          setChips((list) => toggleChip(list, id));
+          const play = chipPlay(id);
+          if (turningOn && play) setDraft((current) => ({ ...current, note: appendChipNote(current.note, play) }));
+        }}
       />
       {express ? (
         <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
