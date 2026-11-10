@@ -25,7 +25,7 @@ const AXES: { id: string; label: string; poles: [string, string]; core?: boolean
   { id: "tone", label: "语气", poles: ["正式克制", "口语亲切"] },
 ];
 
-const GENRES = ["工程实践文章", "解释性文章", "复盘", "教程", "观点文章", "调研报告", "设计文档"];
+const GENRES = ["工程实践文章", "解释性文章", "硬核科技科普", "复盘", "教程", "观点文章", "调研报告", "设计文档"];
 
 const AUDIENCE_PRESETS = [
   "熟悉相关技术、遇到过类似痛点的同行工程师",
@@ -39,6 +39,11 @@ const DEFAULT_APPROACH_OPTIONS = [
     id: "inquiry-climb",
     label: "追问爬坡式：困惑起点 → 追问转折 → 核心机制 → 边界与代价",
     description: "顺着作者在聊天中真实经历的「困惑 → 追问碰撞 → 核心顿悟 → 补充边界」认知路径展开，读者最易产生共鸣。",
+  },
+  {
+    id: "tech-blogger-six-act",
+    label: "科技博主六幕式：悬念钩子 → 建立问题 → 推演笨办法 → 类比与机制 → 证据边界 → 回扣升维",
+    description: "将专业问题包装为大众好奇的悬念，先推演直觉猜想为何碰壁，再用生活类比与真实原理分层揭秘，持续给出认知爽感。",
   },
   {
     id: "problem-tradeoff",

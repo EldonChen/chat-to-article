@@ -7,6 +7,7 @@ import { formatBlock, parseBlock } from "../src/block.ts";
 import { findArticleDirs, loadArticle } from "../src/article.ts";
 import { compileLexicon, lintBody, loadSharedLexicon } from "../src/lexicon.ts";
 import { renderArticle } from "../src/render.ts";
+import { loadStylePresets } from "../src/voice.ts";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const skill = join(repo, "skills/chat-to-article");
@@ -49,4 +50,15 @@ test("lint finds banned phrases and sentence", () => {
   assert.equal(findings[0].sentence, "值得注意的是，这里有问题。");
   const allowed = compileLexicon(loadSharedLexicon(skill), [{ id: "allow-zh-zhuyi", action: "allow", entryId: "zh-zhuyi" }]);
   assert.equal(lintBody("值得注意的是", "b9", allowed).length, 0);
+});
+
+test("loads built-in style presets including tech-blogger and all preset samples pass lexicon lint", () => {
+  const presets = loadStylePresets(skill);
+  const techBlogger = presets.find((p) => p.id === "tech-blogger");
+  assert.ok(techBlogger, "tech-blogger preset should exist");
+  assert.equal(techBlogger.name, "科技博主科普");
+  for (const preset of presets) {
+    const findings = lintBody(preset.sample, preset.id, rules);
+    assert.deepEqual(findings, [], `preset ${preset.id} sample should have no lexicon findings`);
+  }
 });

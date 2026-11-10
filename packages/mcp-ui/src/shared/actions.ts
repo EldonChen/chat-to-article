@@ -226,8 +226,8 @@ export type ReviewOutlineResult = z.infer<typeof reviewOutlineResult>;
 
 export const variantDraft = z.object({
   id: z.string().min(1).describe("版本 id，例如 A、B、C"),
-  voice: z.string().min(1).describe("内置笔调 id（cta.py presets 列出）、profile（按作者的偏好写）或 custom"),
-  label: z.string().min(1).describe("给作者看的名字，例如「按你的偏好」「跟同事复盘」"),
+  voice: z.string().min(1).describe("内置笔调 id（styles/presets.json 中定义的 id，如 tech-blogger、colleague、engineering、explainer、essay、opinion、narrative）、profile（按作者的偏好写）或 custom"),
+  label: z.string().min(1).describe("给作者看的名字，例如「按你的偏好」「科技博主科普」「跟同事复盘」"),
   summary: z.string().optional().describe("一句话说这版和其他版差在哪"),
   body: z.string().min(1).describe("这一版的 Markdown 正文"),
 });

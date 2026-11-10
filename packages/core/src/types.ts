@@ -209,6 +209,16 @@ export interface Candidate {
   [key: string]: unknown;
 }
 
+export interface StylePreset {
+  id: string;
+  name: string;
+  fits: string[];
+  summary: string;
+  traits: string[];
+  avoid: string[];
+  sample: string;
+}
+
 export interface VoiceSnapshot {
   home: string;
   exists: boolean;
@@ -217,6 +227,7 @@ export interface VoiceSnapshot {
   privateLexicon: { entries: PrivateEntry[] } | null;
   exemplars: { ref: string; content: string; referenced: boolean }[];
   candidates: Candidate[];
+  presets?: StylePreset[];
   errors: string[];
 }
 

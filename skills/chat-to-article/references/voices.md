@@ -9,7 +9,7 @@
 1. **如果有个人偏好材料，其中一版写「按你的偏好」（`voice: "profile"`）**：
    - 结合钉住的 `~/.chat-to-article/profile.json`（生效规则与 `exemplars/` 范文）、本篇 `preferences.jsonl` 以及 `~/.chat-to-article/candidates.jsonl` 中尚未转正的候选偏好，写出最贴近作者本人习惯的一版。
 2. **其余版本从 `<skill>/styles/presets.json` 中挑选 2 个反差明显的内置笔调**：
-   - 例如工程主题可对比 `colleague`（「跟同事复盘」，口语自然、保留踩坑经过）与 `engineering`（「工程笔记」，结论先行、克制紧凑），或参考 `presets.json` 中的 `narrator`、`essay`、` briefing` 等。
+   - 例如技术/工程主题可对比 `tech-blogger`（「科技博主科普」，反常识钩子开场、先推演直觉笨办法再分层揭秘）、`colleague`（「跟同事复盘」，口语自然、保留踩坑经过）与 `engineering`（「工程笔记」，结论先行、克制紧凑），或参考 `presets.json` 中的 `explainer`、`essay`、`opinion`、`narrative` 等。
    - 各版本表达的是**相同的事实主张**，区别仅在于切入方式、人称、句式节奏与语气。
 
 ### 怎么让作者挑选与落盘

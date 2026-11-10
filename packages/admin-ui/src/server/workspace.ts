@@ -37,7 +37,7 @@ export class Workspace {
   }
 
   voice() {
-    return loadVoice(this.options.home);
+    return loadVoice(this.options.home, this.skill().dir);
   }
 
   lexicon() {

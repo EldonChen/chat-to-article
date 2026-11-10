@@ -7,7 +7,7 @@ import { Markdown } from "../components/Markdown.tsx";
 import { Card, Empty, ErrorBox, KV, Loading, PageHeader, StatusBadge, Tabs, Tag } from "../components/ui.tsx";
 import { diffLines } from "../lib/diff.ts";
 
-type TabId = "profile" | "rules" | "exemplars" | "history" | "candidates";
+type TabId = "profile" | "rules" | "exemplars" | "history" | "candidates" | "presets";
 
 function RevisionHistory() {
   const { data } = useVoice();
@@ -79,12 +79,25 @@ export function VoicePage() {
   const { data, error, isLoading } = useVoice();
   if (error) return <ErrorBox error={error} />;
   if (isLoading || !data) return <Loading />;
-  if (!data.exists)
+  const presets = data.presets ?? [];
+  if (!data.exists && tab !== "presets")
     return (
       <>
-        <PageHeader title="写作风格" />
+        <PageHeader
+          title="写作风格"
+          actions={
+            presets.length > 0 ? (
+              <button
+                onClick={() => navigate("/voice/presets")}
+                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-200"
+              >
+                查看内置风格预设（{presets.length}）
+              </button>
+            ) : undefined
+          }
+        />
         <Empty icon={<FolderX className="size-8" />} title="声音目录不存在">
-          <code>{data.home}</code> 还没有创建。第一次用 skill 新建文章时会自动生成；也可以用 <code>--home</code> 指向别的位置。
+          <code>{data.home}</code> 还没有创建。第一次用 skill 新建文章时会自动生成；也可以先浏览内置风格预设。
         </Empty>
       </>
     );
@@ -115,6 +128,7 @@ export function VoicePage() {
           { id: "exemplars", label: "范文", count: data.exemplars.length },
           { id: "history", label: "版本历史", count: data.history.length },
           { id: "candidates", label: "候选", count: data.candidates.length, tone: data.candidates.length ? "warn" : undefined },
+          { id: "presets", label: "内置预设", count: presets.length },
         ]}
       />
       <div className="mt-5">
@@ -255,6 +269,62 @@ export function VoicePage() {
             </div>
           ) : (
             <Empty icon={<Lightbulb className="size-8" />} title="没有待确认的候选" />
+          ))}
+
+        {current === "presets" &&
+          (presets.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {presets.map((preset) => (
+                <Card
+                  key={preset.id}
+                  title={
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span>{preset.name}</span>
+                      <span className="font-mono text-xs font-normal text-stone-400">{preset.id}</span>
+                    </span>
+                  }
+                  actions={
+                    <div className="flex flex-wrap gap-1">
+                      {preset.fits.map((f) => (
+                        <Tag key={f}>{f}</Tag>
+                      ))}
+                    </div>
+                  }
+                >
+                  <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{preset.summary}</p>
+                  <div className="mt-3 space-y-2 text-xs">
+                    <div>
+                      <div className="mb-1 font-medium text-emerald-700 dark:text-emerald-400">核心特征</div>
+                      <ul className="list-disc space-y-1 pl-4 text-stone-600 dark:text-stone-300">
+                        {preset.traits.map((t, i) => (
+                          <li key={i}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    {preset.avoid.length > 0 && (
+                      <div>
+                        <div className="mb-1 font-medium text-rose-700 dark:text-rose-400">主动避开</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {preset.avoid.map((a, i) => (
+                            <span key={i} className="rounded bg-rose-50 px-2 py-0.5 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300">
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="pt-1">
+                      <div className="mb-1 font-medium text-stone-500">对照样稿</div>
+                      <div className="whitespace-pre-wrap rounded-lg border border-stone-200/80 bg-stone-50/70 p-3 font-serif text-xs leading-6 text-stone-700 dark:border-stone-800 dark:bg-stone-800/50 dark:text-stone-200">
+                        {preset.sample}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Empty title="未找到内置风格预设" />
           ))}
       </div>
     </>

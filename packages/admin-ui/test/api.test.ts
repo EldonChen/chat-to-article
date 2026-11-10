@@ -59,8 +59,9 @@ test("is read-only and refuses path traversal", async () => {
 });
 
 test("exposes voice and merged lexicon", async () => {
-  const voice = await json<{ profile: { revision: number } }>("/api/voice");
+  const voice = await json<{ profile: { revision: number }; presets: { id: string; name: string }[] }>("/api/voice");
   assert.equal(voice.profile.revision, 1);
+  assert.ok(voice.presets.some((p) => p.id === "tech-blogger" && p.name === "科技博主科普"));
   const lexicon = await json<{ skillDir: string; effective: unknown[] }>("/api/lexicon");
   assert.equal(lexicon.skillDir, skill);
   assert.ok(lexicon.effective.length > 20);
