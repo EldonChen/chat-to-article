@@ -3,6 +3,7 @@ import { AlertTriangle, Check, CheckCheck, KeyRound, Layers, List, Plus, Send } 
 import { useState } from "react";
 import type { ClaimsContext, ReviewClaimsInput, ReviewClaimsResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { AutoTextarea, Badge, buttonClass, Card, FieldComment, Segmented, Tag } from "../components/ui.tsx";
 import { useDraft } from "../store.ts";
 import type { SubmitFn } from "./types.ts";
@@ -48,6 +49,8 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
   }));
   const [groupByRole, setGroupByRole] = useState<boolean>(() => input.claims.some((c) => !!c.role));
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [express, setExpress] = useState(true);
+  const [chips, setChips] = useState<string[]>([]);
 
   const rows = draft.rows;
   const update = (id: string, patch: Partial<Row>) => setDraft((d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) }));
@@ -72,7 +75,7 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
         gapNote: r.gapNote?.trim() || undefined,
         comment: r.comment?.trim() || undefined,
       })),
-      note: draft.note.trim() || undefined,
+      note: withChips(draft.note, chips),
     };
     submit(id, result);
   };
@@ -99,7 +102,8 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
           {r.isNew && <Badge tone="violet">你新加的</Badge>}
           {r.original == null && !r.isNew && <Badge tone="blue">新候选</Badge>}
           <div className="flex flex-wrap items-center gap-1">
-            {CLAIM_ROLES.map((role) => {
+            {!express &&
+              CLAIM_ROLES.map((role) => {
               const active = r.role === role.id;
               return (
                 <button
@@ -123,7 +127,9 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
             <Segmented value={r.status} onChange={(status) => update(r.id, { status })} items={STATUS} />
           </div>
         </div>
-        <AutoTextarea value={r.text} onChange={(text) => update(r.id, { text })} minRows={1} className="font-serif" />
+        <AutoTextarea value={r.text} onChange={(text) => update(r.id, { text })} minRows={3} className="font-serif text-base leading-relaxed" />
+        {!express && (
+          <>
         {(r.gapNote != null || r.status === "disputed") && (
           <div className="mt-2">
             <input
@@ -156,6 +162,8 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
             <FieldComment value={r.comment ?? ""} onChange={(comment) => update(r.id, { comment })} />
           </span>
         </div>
+          </>
+        )}
         {r.secret && (
           <label className="mt-2 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950 dark:text-rose-300">
             <KeyRound className="size-3.5" />
@@ -176,6 +184,15 @@ export function ClaimsView({ session, submit }: { session: SessionDetail<ReviewC
 
   return (
     <>
+      <ExpressChrome
+        express={express}
+        onExpress={setExpress}
+        thread={context.motivation?.ahaMoment || input.context || "先确认哪些判断要写进正文"}
+        hook={context.motivation?.initialConfusion || "主张按痛点、顿悟、证据、边界归堆"}
+        structure={`${rows.filter((r) => r.status === "accepted").length} 条采用 / ${rows.length} 条`}
+        chips={chips}
+        onChip={(id) => setChips((list) => toggleChip(list, id))}
+      />
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="space-y-3">
           {input.context && <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{input.context}</p>}

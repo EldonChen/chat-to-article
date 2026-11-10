@@ -11,6 +11,7 @@ import type {
   WritingPlanFields,
 } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { AutoTextarea, Badge, buttonClass, Card, FieldComment, inputClass } from "../components/ui.tsx";
 import { useDraft } from "../store.ts";
 import type { SubmitFn } from "./types.ts";
@@ -118,6 +119,8 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
   const [newGenre, setNewGenre] = useState("");
   const [showAllAxes, setShowAllAxes] = useState(false);
   const [showJourneyDetail, setShowJourneyDetail] = useState(true);
+  const [express, setExpress] = useState(true);
+  const [chips, setChips] = useState<string[]>([]);
 
   const plan = draft.plan;
   const motivation = plan.motivation ?? emptyMotivation();
@@ -184,13 +187,66 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
         ...(cleanedMotivation ? { motivation: cleanedMotivation } : {}),
       },
       comments,
-      note: draft.note.trim() || undefined,
+      note: withChips(draft.note, chips),
     };
     submit(id, result);
   };
 
   return (
     <>
+      <ExpressChrome
+        express={express}
+        onExpress={setExpress}
+        thread={plan.goldenThread || plan.purpose}
+        hook={motivation.initialConfusion}
+        structure={plan.approach}
+        chips={chips}
+        onChip={(id) => setChips((list) => toggleChip(list, id))}
+      />
+      {express ? (
+        <div className="mx-auto max-w-3xl space-y-4 px-4 py-4">
+          <Card title="就改这几句">
+            <div className="space-y-4">
+              <label className="block">
+                <div className="mb-1 text-sm font-medium text-stone-600">一句话主线</div>
+                <AutoTextarea
+                  value={plan.goldenThread ?? ""}
+                  onChange={(goldenThread) => setPlan({ goldenThread })}
+                  placeholder="读者合上文章还能复述的那一句"
+                  minRows={3}
+                />
+              </label>
+              <label className="block">
+                <div className="mb-1 text-sm font-medium text-stone-600">开篇场景</div>
+                <AutoTextarea
+                  value={motivation.initialConfusion}
+                  onChange={(initialConfusion) => setMotivation({ initialConfusion })}
+                  placeholder="谁在做什么，哪一步失败了。先不要下定义。"
+                  minRows={4}
+                />
+              </label>
+              <label className="block">
+                <div className="mb-1 text-sm font-medium text-stone-600">唯一贯穿比喻</div>
+                <AutoTextarea
+                  value={plan.metaphorLine ?? ""}
+                  onChange={(metaphorLine) => setPlan({ metaphorLine })}
+                  placeholder="一套载体，以及它和机制的对应。不要每段换一个比喻。"
+                  minRows={3}
+                />
+              </label>
+              <label className="block">
+                <div className="mb-1 text-sm font-medium text-stone-600">关键结构</div>
+                <AutoTextarea
+                  value={plan.approach}
+                  onChange={(approach) => setPlan({ approach })}
+                  placeholder="现象里的反常 → 极限推演 → 底层机制"
+                  minRows={4}
+                />
+              </label>
+            </div>
+          </Card>
+        </div>
+      ) : (
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="space-y-4">
           <Card
@@ -726,6 +782,7 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
           )}
         </aside>
       </div>
+      )}
       <ActionBar
         note={draft.note}
         onNote={(note) => setDraft((d) => ({ ...d, note }))}

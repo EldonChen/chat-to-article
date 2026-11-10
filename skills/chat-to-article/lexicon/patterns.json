@@ -26,6 +26,12 @@
       "name": "It's not X. It's Y.",
       "regex": "It's not [^\\n.]{1,80}\\. It's ",
       "severity": "watch"
+    },
+    {
+      "id": "pat-ornament-simile",
+      "name": "装饰性明喻起手（须对照唯一贯穿比喻）",
+      "regex": "仿佛|犹如",
+      "severity": "watch"
     }
   ]
 }

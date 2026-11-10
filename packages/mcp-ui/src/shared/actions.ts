@@ -106,6 +106,8 @@ export const writingPlanFields = z.object({
     .describe("偏好轴：explanationPace、abstraction、stance、perspective、readerAssumption、structure、tone，值写倾向的一句话"),
   approach: z.string().describe("行文方案：推进逻辑，以及为什么适合这篇"),
   openQuestions: z.array(z.string()),
+  goldenThread: z.string().optional().describe("全文唯一主线：读者合上文章还能复述的那一句"),
+  metaphorLine: z.string().optional().describe("唯一贯穿比喻：载体、三行映射、失效处，写成一段"),
   motivation: writingMotivationFields.optional().describe("从用户连续追问中提取的结构化写作动机与认知轨迹"),
   visualStyle: visualStyleSelection.optional().describe("全篇统一的视觉配图画风预设与参考垫图"),
 });
@@ -203,6 +205,8 @@ export const sectionDraft = z.object({
   summary: z.string().optional().describe("这一节打算写什么"),
   readerQuestion: z.string().optional().describe("这一节回应读者心里的什么疑问"),
   cognitiveRole: z.string().optional().describe("这一节在认知爬坡路径中的角色，例如「从痛点切入 → 建立核心洞察」"),
+  bridgeFromPrev: z.string().optional().describe("本节第一句要接住的上一节物件或未完成动作"),
+  hookToNext: z.string().optional().describe("本节末尾交出去、下一节必须先接住的物件"),
 });
 
 export const visualRoleEnum = z.enum(["hook", "analogy", "comparison", "mechanism", "evidence", "architecture"]);

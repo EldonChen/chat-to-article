@@ -14,7 +14,10 @@
     {"id": "zh-funeng", "phrase": "赋能", "severity": "watch"},
     {"id": "zh-zhuashou", "phrase": "抓手", "severity": "watch"},
     {"id": "zh-bihuan", "phrase": "闭环", "severity": "watch"},
-    {"id": "zh-diceng", "phrase": "底层逻辑", "severity": "watch"}
+    {"id": "zh-diceng", "phrase": "底层逻辑", "severity": "watch"},
+    {"id": "zh-qiasi", "phrase": "恰似", "severity": "watch"},
+    {"id": "zh-wanru", "phrase": "宛如", "severity": "watch"},
+    {"id": "zh-haosi", "phrase": "好似", "severity": "watch"}
   ],
   "patterns": []
 }

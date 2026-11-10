@@ -25,6 +25,7 @@ import {
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BlockContext, BlockFigureRequest, ReviewBlockInput, ReviewBlockResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { Mermaid } from "../components/Mermaid.tsx";
 import { TextDiff, textChanges } from "../components/TextDiff.tsx";
 import { AutoTextarea, Badge, buttonClass, inputClass, Tag, useDarkMode } from "../components/ui.tsx";
@@ -154,6 +155,8 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
   const [newFigAnchor, setNewFigAnchor] = useState<string>("");
   const [newFigPrompt, setNewFigPrompt] = useState<string>("");
   const [newFigAspectRatio, setNewFigAspectRatio] = useState<string>("16:9");
+  const [express, setExpress] = useState(true);
+  const [chips, setChips] = useState<string[]>([]);
 
   const paperRef = useRef<HTMLDivElement>(null);
   const commentInputs = useRef<Record<string, HTMLTextAreaElement | null>>({});
@@ -267,18 +270,27 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
       comments: filledComments.map((c) => ({ id: c.id, quote: c.quote, text: c.text.trim() })),
       ...(figuresChanged ? { figureIds: currentFigureIds } : {}),
       ...(figureRequests.length > 0 ? { figureRequests } : {}),
-      note: draft.note.trim() || undefined,
+      note: withChips(draft.note, chips),
     };
     submit(id, result);
   };
 
-  const canRevise = edited || filledComments.length > 0 || figuresChanged || !!draft.note.trim();
+  const canRevise = edited || filledComments.length > 0 || figuresChanged || !!draft.note.trim() || chips.length > 0;
   const styleTag = activeComment ? `[data-comment="${activeComment}"]{background:rgb(252 211 77 / .75);border-color:#d97706}` : "";
 
   return (
     <>
       <style>{styleTag}</style>
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_23rem]">
+      <ExpressChrome
+        express={express}
+        onExpress={setExpress}
+        thread={context.readerQuestion || input.instruction || "先读这一块，像读文章一样"}
+        hook={context.cognitiveRole || "看不懂就点上面的芯片，不必先划词"}
+        structure={input.blockId}
+        chips={chips}
+        onChip={(id) => setChips((list) => toggleChip(list, id))}
+      />
+      <div className={clsx("mx-auto grid max-w-7xl gap-6 px-4 py-4", !express && "@4xl:grid-cols-[minmax(0,1fr)_23rem]")}>
         <div className="min-w-0 space-y-4">
           {input.instruction && (
             <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-200">
@@ -347,7 +359,7 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
               {context.prev && (
                 <div className="mb-6 border-l-2 border-stone-200 pl-4 font-serif text-sm leading-7 text-stone-400 dark:border-stone-700" title="前一块，只读">
                   <span className="mr-2 font-sans text-xs">{context.prev.id} ↑</span>
-                  {context.prev.body.slice(-120)}
+                  {context.prev.body}
                 </div>
               )}
               <EditorContent editor={editor} />
@@ -421,13 +433,14 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
               {context.next && (
                 <div className="mt-6 border-l-2 border-stone-200 pl-4 font-serif text-sm leading-7 text-stone-400 dark:border-stone-700" title="后一块，只读">
                   <span className="mr-2 font-sans text-xs">{context.next.id} ↓</span>
-                  {context.next.body.slice(0, 120)}
+                  {context.next.body}
                 </div>
               )}
             </div>
           </div>
         </div>
 
+        {!express && (
         <aside className="space-y-3 @4xl:sticky @4xl:top-4 @4xl:self-start">
           <div className="flex flex-wrap gap-1 rounded-lg bg-stone-200/60 p-0.5 dark:bg-stone-800">
             {(
@@ -523,7 +536,7 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
                       commentInputs.current[c.id] = el;
                     }}
                     value={c.text}
-                    rows={2}
+                    rows={5}
                     placeholder="写下你的意见…"
                     onChange={(e) => setDraft((d) => ({ ...d, comments: { ...d.comments, [c.id]: e.target.value } }))}
                     className="w-full resize-none rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-sm outline-none focus:border-amber-400 dark:border-stone-700 dark:bg-stone-800"
@@ -835,6 +848,7 @@ export function BlockReview({ session, submit }: { session: SessionDetail<Review
             </div>
           )}
         </aside>
+        )}
       </div>
 
       <ActionBar

@@ -25,6 +25,15 @@ description: >-
 
 将这套**写作动机**融入成文过程：一方面借助写作的严密性帮助作者补齐聊天时跳过的缺口（加深作者自身的结构化认知）；另一方面顺着作者亲历的认知坡度组织章节（而非全知视角的教科书平铺），让处于相似困惑起点的读者自然读懂，形成正向飞轮。
 
+动机是原料，不是章节顺序。面向大众的科普（影视飓风 / 毕导这一路）还要另写一份**叙事契约**，记在 `writing-plan.json`，并在大纲每一节落地。工程笔记可以更克制，但不得用「别铺垫」删掉下面这些已经写下的字段。
+
+1. **开篇故事弧（`openingArc`）**：一个能指认的场景（谁、在做什么、哪一步失败了）→ 还没解开的悬念 → 通向第一节机制的桥梁。首段禁止下定义、禁止先抛术语。
+2. **三层递进追问（`questionLadder`）**：现象里的反常 → 把条件推到极限后直觉解释为什么垮 → 垮掉的那一步对应什么机制。只有现象层「为什么」的大纲，还不能当科普提纲。
+3. **段间桥（`bridgeFromPrev` / `hookToNext`）**：上一节最后把一个具体物件或未完成动作交出来，下一节第一句先接住它，再往下走。禁止用「接下来我们看看」这类空转折代替桥。
+4. **术语三步降维**：先给读者脑子里已经有的直觉画面，再写成一个看得见的动作，最后才挂上术语标签。名字出现时，画面必须已经在场。
+
+全文只留一条主线、只留一套贯穿比喻的要求见 [style.md](references/style.md) 与 [voices.md](references/voices.md)。
+
 ---
 
 ## 一、可用资源（Resources）
@@ -104,7 +113,8 @@ articles/<slug>/
    - **视觉触发与设计简报**：在开场反常识钩子（`hook`）、生活类比/拟人条漫（`analogy`）、笨办法 vs 新方案对比（`comparison`）、多步核心机制（`mechanism`）、数据冲击证据（`evidence`）或全局认知地图（`architecture`）处规划配图，在 `figures/manifest.json` 中记录 `role`、`intent`（配图意图）、`takeaway`（一秒结论）与 `anchorSummary`（图文联动契约）。
    - **多模态生图与风格统一**：当用户在大纲（`review_outline`）、正文块（`review_block`）或图审阅（`review_figure`）中确认了 `raster` 配图，或在对话中要求生图时（`confirmed: true`），结合本篇锁定的 `visualStyle`（如 `tech-spotlight`、`whiteboard-sketch`、`editorial-comic`、`minimal-blueprint`）组装五要素 `prompt` 调用 `GenerateImage`；优先通过 `reference_image_paths` 传入首张已确认插图或个人范例样张以保持全篇画风一致，生图后立即用 `Read` 工具亲眼检视画面细节。
    - **看图写文、以图减文与双向迭代**：图负责展示空间结构、分屏反差与完整流转，正文只负责引出问题、引导视线看图眼细节与交代隐含边界，**绝不把图上的步骤用文字啰嗦复述一遍**；当图片迭代导致结构、比喻或结论改变时，将关联块标为 `stale` 并局部微调正文，保持图文同步（详见 [figures.md](references/figures.md)）。
-5. **干净的分享包（`export/`）**：
+5. **叙事契约优先于「开门见山」**：科普体裁下，`openingArc`、`questionLadder`、段间桥和术语三步降维是硬字段。个人档案里的「段首直接给问题、不写铺垫」只禁止空泛总括，不禁止场景、悬念和桥。局部修订仍只改被点名的块，但该块的 `bridgeFromPrev` 必须重写，并读相邻块的全文，而不是只看一两句尾巴。
+6. **干净的分享包（`export/`）**：
    - 交付给读者的 `export/` 不含块锚点、不含会话 ID、不含未脱敏的密钥（`sk-...` 等），且所有被大纲引用的块和图均已就绪、无 `ban` 级禁用套话。
 
 ---
@@ -115,11 +125,11 @@ articles/<slug>/
 
 ### 路径 A：从追问对话整理新文章（以写促学完整路径）
 适合用户给了一段或多段探索性聊天，希望梳理成一篇有深度、好读的文章：
-1. **还原动机与写作计划**：阅读对话中的用户提问序列，提炼 `motivation`（困惑起点 → 追问演进链 → 核心顿悟 → 待补认知缺口 → 读者共鸣价值），结合文体、目标读者与行文方案形成 `writing-plan.json`（可调用 `review_writing_plan` 或对未知方向用 `ask_questions` 提问，详见 [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)）。
-2. **梳理认知链式主张**：从全文材料中抽取核心主张写入 `claims.jsonl`，按 `friction`（痛点/直觉冲突）、`insight`（核心顿悟）、`evidence`（机制/证据）、`boundary`（适用边界）归类并标出待补缺口，交作者审阅（可调用 `review_claims`）。
-3. **规划读者认知大纲**：将行文方案展开为 `outline.json`，为每节明确 `readerQuestion`（回应读者心里的什么疑问）与 `cognitiveRole`（认知推进角色），规划必要的图表（可调用 `review_outline`）。
-4. **首块校准笔调与分段起草**：若本篇尚未确定笔调，第一块可按 [voices.md](references/voices.md) 提供 2–3 版不同笔调供作者挑选（可调用 `review_variants`）；随后按块起草并审阅（可调用 `review_block`、`review_figure`），随作者反馈即时更新 `preferences.jsonl`。
-5. **词表检查、风格沉淀与导出**：运行 `cta.py lint` 修正命中的禁用套话单句，询问作者是否将本篇新学到的偏好写入全局风格档案（可调用 `review_style_candidates`），最后运行 `cta.py compile --article ... --export` 生成分享包。
+1. **还原动机与叙事契约**：阅读对话中的用户提问序列，提炼 `motivation`（困惑起点 → 追问演进链 → 核心顿悟 → 待补认知缺口 → 读者共鸣价值），并写成读者能跟着走的 `openingArc`、`questionLadder` 与每节的桥（详见 [writing-plan.md](references/writing-plan.md)、[discovery-questions.md](references/discovery-questions.md)）。可调用 `review_writing_plan`；方向不明时才用 `ask_questions`，一次只问会改变故事弧的分岔。
+2. **梳理认知链式主张**：从全文材料中抽取核心主张写入 `claims.jsonl`，按 `friction` / `insight` / `evidence` / `boundary` 归类。默认把主张摘要写进写作计划的快审稿，不单独调用 `review_claims`。只有密钥未处理、事实对不上，或作者点了诊断芯片时，才打开主张审阅。
+3. **规划读者认知大纲**：将叙事契约展开为 `outline.json`，每节写 `readerQuestion`、`bridgeFromPrev`、`hookToNext`，开篇安排强反差图。默认不单独调用 `review_outline`，除非作者要改结构。
+4. **成稿快审**：按块起草。科普默认笔调用 `tech-blogger` 的叙事契约，不要为了选文风先跑一轮 `review_variants`。用 `review_block` 给作者读开篇和点了芯片的块。图随块看；只有 raster 需要亲眼看画面，或作者说图没有冲击力时，才调用 `review_figure`。
+5. **词表检查与导出**：运行 `cta.py lint` 修正命中的禁用套话。观察级的明喻起手式先对照唯一贯穿比喻，不属于那一套就改掉。风格候选默认不打断成稿，作者要求沉淀时再调用 `review_style_candidates`。最后 `cta.py compile --article ... --export`。
 
 ### 路径 B：材料与结构已成型，快速成稿
 适合用户已经给出了清晰的提纲、成熟观点或结构化笔记，希望快速成文：

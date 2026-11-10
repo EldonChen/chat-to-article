@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Clock, FileText, Image as ImageIcon, Link2, Plus,
 import { useMemo, useState } from "react";
 import type { FigureContext, ReviewFigureInput, ReviewFigureResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { Mermaid } from "../components/Mermaid.tsx";
 import { TextDiff } from "../components/TextDiff.tsx";
 import { AutoTextarea, Badge, buttonClass, Card, inputClass, Tag, useDarkMode } from "../components/ui.tsx";
@@ -36,6 +37,8 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
     note: "",
   }));
   const [newRefPath, setNewRefPath] = useState("");
+  const [express, setExpress] = useState(true);
+  const [chips, setChips] = useState<string[]>([]);
 
   const rules = useMemo(() => compileRules(context.rules), [context.rules]);
   const hits = useMemo(() => {
@@ -86,13 +89,22 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
       blockIds: draft.blockIds,
       markBlocksStale: draft.markBlocksStale || undefined,
       textSyncNote: draft.textSyncNote.trim() || undefined,
-      note: draft.note.trim() || undefined,
+      note: withChips(draft.note, chips),
     };
     submit(id, result);
   };
 
   return (
     <>
+      <ExpressChrome
+        express={express}
+        onExpress={setExpress}
+        thread={draft.takeaway || "这张图 3 秒内要让人说出的那句"}
+        hook={draft.intent || "开篇用强反差，机制用一张解剖"}
+        structure={`${kind} · ${draft.role}`}
+        chips={chips}
+        onChip={(id) => setChips((list) => toggleChip(list, id))}
+      />
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-4 @4xl:grid-cols-2">
         <div className="space-y-4">
           <Card
@@ -218,7 +230,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                     value={draft.textSyncNote}
                     onChange={(textSyncNote) => setDraft((d) => ({ ...d, textSyncNote, markBlocksStale: textSyncNote.trim() ? true : d.markBlocksStale }))}
                     placeholder="给正文块的联动修改指令（可选，例如：图里已经画清了四步流转，把 b002 里罗列步骤的句子删掉，直接点出单向引用关系）"
-                    minRows={1}
+                    minRows={3}
                     className="text-xs"
                   />
                 </div>
@@ -264,7 +276,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                   value={draft.intent}
                   onChange={(intent) => setDraft((d) => ({ ...d, intent }))}
                   placeholder="例如：把『全文塞进上下文导致重写』与『只递单块上手术台』做成直观对比，省去两段抽象解释"
-                  minRows={1}
+                  minRows={3}
                 />
               </label>
               <label className="block">
@@ -273,7 +285,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                   value={draft.takeaway}
                   onChange={(takeaway) => setDraft((d) => ({ ...d, takeaway }))}
                   placeholder="例如：修改只发生在单块文件内，主张与大纲作为上游契约按引用精确传播"
-                  minRows={1}
+                  minRows={3}
                 />
               </label>
               <label className="block">
@@ -282,7 +294,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                   value={draft.anchorSummary}
                   onChange={(anchorSummary) => setDraft((d) => ({ ...d, anchorSummary }))}
                   placeholder="例如：图中节点依次为「主张」→「大纲」→「正文块」→「分享包」；正文直接引用这四个名称，不重复抄写箭头顺序"
-                  minRows={1}
+                  minRows={3}
                 />
               </label>
             </div>
@@ -351,12 +363,13 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                   <AutoTextarea
                     value={draft.prompt}
                     onChange={(prompt) => setDraft((d) => ({ ...d, prompt }))}
-                    placeholder="详细描述画面主体、分屏对比或漫画分镜细节…"
-                    minRows={4}
-                    className="font-mono text-xs"
+                    placeholder="左边是什么，右边差在哪一个变量，视线先落在哪里"
+                    minRows={6}
+                    className="text-sm leading-relaxed"
                   />
                 </div>
 
+                {!express && (
                 <div>
                   <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-stone-500">
                     <span>参考垫图（reference_image_paths，用于跨图锁定画风或草图转精图）：</span>
@@ -408,6 +421,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                     </button>
                   </div>
                 </div>
+                )}
               </div>
             </Card>
           ) : (
