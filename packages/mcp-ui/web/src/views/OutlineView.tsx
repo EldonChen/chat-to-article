@@ -246,7 +246,7 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                     <AutoTextarea
                       value={s.bridgeFromPrev ?? ""}
                       onChange={(bridgeFromPrev) => update(s.id, { bridgeFromPrev })}
-                      placeholder="接住上一节的哪个物件？第一节接开篇那个没做完的动作。"
+                      placeholder="接住上一节的哪个状态或未解问题？"
                       minRows={2}
                     />
                     <AutoTextarea

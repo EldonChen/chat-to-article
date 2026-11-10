@@ -275,7 +275,7 @@ export function FigureView({ session, submit }: { session: SessionDetail<ReviewF
                 <AutoTextarea
                   value={draft.intent}
                   onChange={(intent) => setDraft((d) => ({ ...d, intent }))}
-                  placeholder="例如：把『全文塞进上下文导致重写』与『只递单块上手术台』做成直观对比，省去两段抽象解释"
+                  placeholder="例如：左边整篇都被写回，右边只写回这次提交的那一块。图上用文件和写回范围，不用另一套生活场景"
                   minRows={3}
                 />
               </label>

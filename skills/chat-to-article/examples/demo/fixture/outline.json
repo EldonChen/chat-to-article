@@ -8,8 +8,8 @@
       "claimIds": ["c1"],
       "figureIds": [],
       "blockIds": ["b001"],
-      "bridgeFromPrev": "夜里只改一个词，手指停在被换掉的那一段上。",
-      "hookToNext": "递出去的是单独的一栏，图要放进哪一栏还没说。"
+      "bridgeFromPrev": "夜里只改一个词，回来时别的段也变了。",
+      "hookToNext": "写回范围收成一块之后，图文件还没说放在哪。"
     },
     {
       "id": "s2",
@@ -19,8 +19,8 @@
       "claimIds": ["c2"],
       "figureIds": ["fig-flow"],
       "blockIds": ["b002"],
-      "bridgeFromPrev": "这一栏已经递出去了，图还没说放在哪一栏。",
-      "hookToNext": "图跟着这一栏走，整份简历不再另开柜子。"
+      "bridgeFromPrev": "这一块已经限定了写回范围，图文件还没安放。",
+      "hookToNext": "图文件跟这一块走，不再另存一套对不上的副本。"
     }
   ]
 }

@@ -107,7 +107,7 @@ export const writingPlanFields = z.object({
   approach: z.string().describe("行文方案：推进逻辑，以及为什么适合这篇"),
   openQuestions: z.array(z.string()),
   goldenThread: z.string().optional().describe("全文唯一主线：读者合上文章还能复述的那一句"),
-  metaphorLine: z.string().optional().describe("唯一贯穿比喻：载体、三行映射、失效处，写成一段"),
+  metaphorLine: z.string().optional().describe("可选。机制算完之后的半句类比。不能代替这一步的输入、状态和数值，可以留空"),
   motivation: writingMotivationFields.optional().describe("从用户连续追问中提取的结构化写作动机与认知轨迹"),
   visualStyle: visualStyleSelection.optional().describe("全篇统一的视觉配图画风预设与参考垫图"),
 });

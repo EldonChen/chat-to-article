@@ -29,7 +29,7 @@
     },
     {
       "id": "pat-ornament-simile",
-      "name": "装饰性明喻起手（须对照唯一贯穿比喻）",
+      "name": "装饰性明喻起手（机制算完之前改写成直接叙述）",
       "regex": "仿佛|犹如",
       "severity": "watch"
     }

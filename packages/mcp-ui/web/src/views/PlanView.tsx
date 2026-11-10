@@ -226,16 +226,16 @@ export function PlanView({ session, submit }: { session: SessionDetail<ReviewWri
                 <AutoTextarea
                   value={motivation.initialConfusion}
                   onChange={(initialConfusion) => setMotivation({ initialConfusion })}
-                  placeholder="谁在做什么，哪一步失败了。先不要下定义。"
+                  placeholder="这个技术是什么。放一个看得见的输入，和它实际吐出的输出。"
                   minRows={4}
                 />
               </label>
               <label className="block">
-                <div className="mb-1 text-sm font-medium text-stone-600">唯一贯穿比喻</div>
+                <div className="mb-1 text-sm font-medium text-stone-600">可选半句类比</div>
                 <AutoTextarea
                   value={plan.metaphorLine ?? ""}
                   onChange={(metaphorLine) => setPlan({ metaphorLine })}
-                  placeholder="一套载体，以及它和机制的对应。不要每段换一个比喻。"
+                  placeholder="机制算完之后的半句。不能代替这一步的输入、状态和数值。可以留空。"
                   minRows={3}
                 />
               </label>
