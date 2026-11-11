@@ -50,6 +50,16 @@ export function OverviewPage() {
   return (
     <>
       <PageHeader title="概览" subtitle={ctx.data ? `正在查看 ${ctx.data.root}` : undefined} />
+      <Link
+        to="/rsi"
+        className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100"
+      >
+        <span>
+          <strong>RSI 演进看板</strong>
+          <span className="mt-0.5 block text-xs text-rose-700/80 dark:text-rose-200/70">直接读取 iterations 里的文章、分数、梯度和插图。地址也可以用 /?tab=rsi。</span>
+        </span>
+        <ArrowRight className="size-4 shrink-0" />
+      </Link>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="文章" value={list.length} hint={`${list.filter((a) => a.hasExport).length} 篇已有分享包`} icon={<BookOpenText className="size-4" />} />
         <Stat label="待审块" value={pendingBlocks} hint="草稿与待复核" icon={<FilePenLine className="size-4" />} />

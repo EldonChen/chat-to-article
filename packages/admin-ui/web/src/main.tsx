@@ -10,6 +10,7 @@ import { ExportPage } from "./pages/Export.tsx";
 import { LexiconPage } from "./pages/Lexicon.tsx";
 import { NotFound } from "./pages/NotFound.tsx";
 import { OverviewPage } from "./pages/Overview.tsx";
+import { RsiWorkbenchPage } from "./pages/RsiWorkbench.tsx";
 import { VoicePage } from "./pages/Voice.tsx";
 
 const queryClient = new QueryClient({
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { path: "/", element: <OverviewPage /> },
+      { path: "/rsi", element: <RsiWorkbenchPage /> },
       { path: "/articles", element: <ArticlesPage /> },
       { path: "/articles/:id", element: <ArticleDetailPage /> },
       { path: "/articles/:id/:tab", element: <ArticleDetailPage /> },

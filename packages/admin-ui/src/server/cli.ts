@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import { serve } from "@hono/node-server";
 import { pickPort, resolveVoiceHome } from "@liem-opc/chat-to-article-core";
 import { createApp } from "./app.ts";
+import { resolveRsiRoot } from "./rsi.ts";
 import { Workspace } from "./workspace.ts";
 
 const HELP = `chat-to-article-admin-ui — 聊出文章来的只读管理台
@@ -19,6 +20,7 @@ const HELP = `chat-to-article-admin-ui — 聊出文章来的只读管理台
   --depth <n>     向下查找文章目录的层数，默认 6
   --port <n>      端口，默认 4310，被占用时顺延
   --host <host>   监听地址，默认 127.0.0.1
+  --rsi <dir>     RSI 目录（含 baseline-case 与 iterations），默认自动探测
   --no-open       不自动打开浏览器
   -h, --help      显示帮助
 `;
@@ -32,6 +34,7 @@ async function main() {
       depth: { type: "string" },
       port: { type: "string" },
       host: { type: "string" },
+      rsi: { type: "string" },
       "no-open": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
@@ -46,10 +49,11 @@ async function main() {
   const home = resolveVoiceHome(values.home);
   const host = values.host ?? "127.0.0.1";
   const workspace = new Workspace({ root, home, skill: values.skill, depth: Number(values.depth ?? 6) });
+  const rsiRoot = resolveRsiRoot(values.rsi);
 
   const here = dirname(fileURLToPath(import.meta.url));
   const webDir = join(here, "web");
-  const app = createApp(workspace, existsSync(join(webDir, "index.html")) ? webDir : null);
+  const app = createApp(workspace, existsSync(join(webDir, "index.html")) ? webDir : null, { rsiRoot });
 
   const port = await pickPort(Number(values.port ?? 4310), host);
   const server = serve({ fetch: app.fetch, port, hostname: host }, async (info) => {
@@ -63,6 +67,7 @@ async function main() {
         `  文章目录  ${root}（找到 ${count} 篇）`,
         `  声音目录  ${home}${existsSync(home) ? "" : "（不存在）"}`,
         `  skill     ${workspace.skill().dir ?? "未找到，共享词表不可用"}`,
+        `  RSI       ${rsiRoot ?? "未找到 iterations"}`,
         "",
         "  按 Ctrl+C 退出",
         "",
