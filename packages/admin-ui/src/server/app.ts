@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zipSync } from "fflate";
 import { readStaticFile, spaAsset } from "@liem-opc/chat-to-article-core";
+import { errorStatus, readFigure, saveRating, scanRsi } from "./rsi.ts";
 import { Workspace, type MarkdownVariant } from "./workspace.ts";
 
 declare const __APP_VERSION__: string;
@@ -12,11 +13,14 @@ function attachment(name: string): string {
 
 const VARIANTS = new Set<MarkdownVariant>(["export", "clean", "working"]);
 
-export function createApp(workspace: Workspace, webDir: string | null) {
+export function createApp(workspace: Workspace, webDir: string | null, options?: { rsiRoot?: string | null }) {
   const app = new Hono();
+  const rsiRoot = options?.rsiRoot ?? null;
 
   app.use("/api/*", async (c, next) => {
-    if (c.req.method !== "GET" && c.req.method !== "HEAD") {
+    const path = new URL(c.req.url).pathname;
+    const ratingWrite = c.req.method === "POST" && /^\/api\/rsi\/rounds\/[^/]+\/rating$/.test(path);
+    if (!ratingWrite && c.req.method !== "GET" && c.req.method !== "HEAD") {
       return c.json({ error: "管理台是只读的" }, 405);
     }
     await next();
@@ -31,7 +35,33 @@ export function createApp(workspace: Workspace, webDir: string | null) {
       home: workspace.options.home,
       skillDir: skill.dir,
       readOnly: true,
+      rsiRoot,
     });
+  });
+
+  app.get("/api/rsi/rounds", (c) => c.json(scanRsi(rsiRoot)));
+
+  app.get("/api/rsi/rounds/:roundId/figures/:filename", (c) => {
+    if (!rsiRoot) return c.json({ error: "没有 RSI 目录" }, 404);
+    const file = readFigure(rsiRoot, c.req.param("roundId"), c.req.param("filename"));
+    if (!file) return c.json({ error: "找不到这张图" }, 404);
+    c.header("Content-Type", file.type);
+    c.header("Content-Disposition", "inline");
+    return c.body(new Uint8Array(file.body));
+  });
+
+  app.post("/api/rsi/rounds/:roundId/rating", async (c) => {
+    if (!rsiRoot) return c.json({ error: "没有 RSI 目录" }, 404);
+    const body = await c.req.json().catch(() => null);
+    if (!body || typeof body !== "object") return c.json({ error: "需要 JSON 正文" }, 400);
+    try {
+      const rating = saveRating(rsiRoot, c.req.param("roundId"), body as { dimensions?: unknown; chips?: unknown; note?: unknown });
+      return c.json({ rating, feedbackMarkdown: rating.feedbackMarkdown });
+    } catch (error) {
+      const status = errorStatus(error);
+      const code = status === 400 || status === 404 ? status : 500;
+      return c.json({ error: error instanceof Error ? error.message : "保存失败" }, code);
+    }
   });
 
   app.get("/api/voice", (c) => c.json(workspace.voice()));

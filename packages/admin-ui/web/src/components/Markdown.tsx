@@ -40,10 +40,11 @@ export function Mermaid({ source }: { source: string }) {
   return <div ref={ref} className="not-prose my-4 flex justify-center overflow-x-auto [&_svg]:max-w-full" />;
 }
 
-export function Markdown({ text, className, resolveAsset }: {
+export function Markdown({ text, className, resolveAsset, onImageClick }: {
   text: string;
   className?: string;
   resolveAsset?: (src: string) => string;
+  onImageClick?: (src: string, alt: string) => void;
 }) {
   return (
     <div className={clsx("prose prose-stone max-w-none dark:prose-invert prose-headings:font-semibold", className)}>
@@ -66,8 +67,16 @@ export function Markdown({ text, className, resolveAsset }: {
             return isMermaid ? <>{children}</> : <pre {...rest}>{children}</pre>;
           },
           img({ src, alt }) {
-            const resolved = typeof src === "string" && resolveAsset && !/^https?:/.test(src) ? resolveAsset(src) : src;
-            return <img src={resolved as string} alt={alt ?? ""} className="mx-auto rounded-lg" />;
+            const resolved = typeof src === "string" && resolveAsset && !/^https?:/.test(src) && !src.startsWith("/") ? resolveAsset(src) : src;
+            const url = typeof resolved === "string" ? resolved : undefined;
+            return (
+              <img
+                src={url}
+                alt={alt ?? ""}
+                className={clsx("mx-auto rounded-lg", onImageClick && url && "cursor-zoom-in")}
+                onClick={onImageClick && url ? () => onImageClick(url, alt ?? "") : undefined}
+              />
+            );
           },
         }}
       >

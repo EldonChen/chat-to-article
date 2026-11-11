@@ -5,6 +5,7 @@ import type {
   LexiconSnapshot,
   VoiceSnapshot,
 } from "@liem-opc/chat-to-article-core/types";
+import type { RsiIndex } from "./lib/rsi.ts";
 import { useUi } from "./store.ts";
 
 export type ArticleListItem = ArticleSummary & { id: string };
@@ -16,6 +17,7 @@ export interface Context {
   home: string;
   skillDir: string | null;
   readOnly: boolean;
+  rsiRoot?: string | null;
 }
 
 async function getJson<T>(path: string): Promise<T> {
@@ -63,6 +65,24 @@ export const assetUrl = (id: string, path: string) => `/api/articles/${id}/asset
 
 export const zipUrl = (ids: string[], prefer: "export" | "clean") =>
   `/api/export.zip?ids=${ids.map(encodeURIComponent).join(",")}&prefer=${prefer}`;
+
+export const useRsiRounds = (poll: boolean) =>
+  useQuery({
+    queryKey: ["rsi-rounds"],
+    queryFn: () => getJson<RsiIndex>("/api/rsi/rounds"),
+    refetchInterval: poll ? 5000 : false,
+  });
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload = (await res.json().catch(() => null)) as ({ error?: string } & T) | null;
+  if (!res.ok) throw new Error(payload?.error ?? `${res.status} ${res.statusText}`);
+  return payload as T;
+}
 
 export async function fetchMarkdown(id: string, variant: MarkdownVariant): Promise<string> {
   const res = await fetch(markdownUrl(id, variant));
