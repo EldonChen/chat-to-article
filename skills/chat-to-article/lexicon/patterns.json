@@ -5,13 +5,13 @@
   "patterns": [
     {
       "id": "pat-bushi",
-      "name": "不是A而是B",
+      "name": "不是A而是B（保持观察，不升为禁用，避免误杀路标式对照）",
       "regex": "不是[^。！？\\n]{1,40}而是",
       "severity": "watch"
     },
     {
       "id": "pat-bujin",
-      "name": "不仅A更B",
+      "name": "不仅A更B（保持观察，不升为禁用）",
       "regex": "不仅[^。！？\\n]{1,40}更",
       "severity": "watch"
     },
