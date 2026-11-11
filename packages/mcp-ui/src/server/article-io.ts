@@ -378,6 +378,8 @@ export function writeOutline(
     summary?: string;
     readerQuestion?: string;
     cognitiveRole?: string;
+    bridgeFromPrev?: string;
+    hookToNext?: string;
   }[],
 ): void {
   writeJson(join(dir, "outline.json"), {
@@ -387,6 +389,8 @@ export function writeOutline(
       ...(s.readerQuestion?.trim() ? { readerQuestion: s.readerQuestion.trim() } : {}),
       ...(s.cognitiveRole?.trim() ? { cognitiveRole: s.cognitiveRole.trim() } : {}),
       ...(s.summary?.trim() ? { summary: s.summary.trim() } : {}),
+      ...(s.bridgeFromPrev?.trim() ? { bridgeFromPrev: s.bridgeFromPrev.trim() } : {}),
+      ...(s.hookToNext?.trim() ? { hookToNext: s.hookToNext.trim() } : {}),
       claimIds: s.claimIds,
       figureIds: s.figureIds ?? [],
       blockIds: s.blockIds ?? [],

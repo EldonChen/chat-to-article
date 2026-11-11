@@ -59,7 +59,7 @@ export const buttonClass = (variant: "primary" | "secondary" | "ghost" | "danger
 export const inputClass =
   "w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm outline-none ring-emerald-500/20 placeholder:text-stone-400 focus:border-emerald-400 focus:ring-4 dark:border-stone-700 dark:bg-stone-900";
 
-export function AutoTextarea({ value, onChange, placeholder, className, minRows = 2 }: {
+export function AutoTextarea({ value, onChange, placeholder, className, minRows = 3 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;

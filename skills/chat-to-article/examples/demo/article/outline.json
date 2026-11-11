@@ -7,7 +7,9 @@
       "cognitiveRole": "从痛点切入 → 建立核心洞察",
       "claimIds": ["c1"],
       "figureIds": [],
-      "blockIds": ["b001"]
+      "blockIds": ["b001"],
+      "bridgeFromPrev": "夜里只改一个词，手指停在被换掉的那一段上。",
+      "hookToNext": "递出去的是单独的一栏，图要放进哪一栏还没说。"
     },
     {
       "id": "s2",
@@ -16,7 +18,9 @@
       "cognitiveRole": "补充机制证据 → 落地完整工作流",
       "claimIds": ["c2"],
       "figureIds": ["fig-flow"],
-      "blockIds": ["b002"]
+      "blockIds": ["b002"],
+      "bridgeFromPrev": "这一栏已经递出去了，图还没说放在哪一栏。",
+      "hookToNext": "图跟着这一栏走，整份简历不再另开柜子。"
     }
   ]
 }

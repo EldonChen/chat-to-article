@@ -161,7 +161,7 @@ const reviewWritingPlan: Handler<typeof reviewWritingPlanArgs, typeof reviewWrit
       `用户确认了写作计划，已自动创建并写入 ${join(dir, "writing-plan.json")}（status: confirmed）与 meta.json。`,
       ...comments,
       note(result.note),
-      "可继续整理主张或大纲。",
+      "可继续起草。默认科普快审到这里就可以写，不要接着把主张、大纲、笔调、逐块、逐图各开一轮。只在用户点了诊断芯片、留下批注，或有未处理的密钥和事实缺口时，再打开对应的审阅。",
     );
   },
 };
@@ -413,7 +413,7 @@ const reviewVariants: Handler<typeof reviewVariantsArgs, typeof reviewVariantsRe
       ...feedback,
       note(result.note),
       LEARN_HINT,
-      "接下来可调用 review_block 把选中的这版交给用户精修（若有刚记下的偏好，可先微调后再展示）。",
+      "接下来只在用户要求精修时调用 review_block。默认不要为了过关再逐块打开。",
     );
   },
 };

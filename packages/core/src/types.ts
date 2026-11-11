@@ -40,6 +40,8 @@ export interface WritingPlan {
   styleAxes: Record<string, string>;
   approach: string;
   openQuestions: string[];
+  goldenThread?: string;
+  metaphorLine?: string;
   motivation?: WritingMotivation;
   voice?: { id: string; name?: string; note?: string };
   visualStyle?: { id: string; name?: string; note?: string; referenceImage?: string };
@@ -75,6 +77,8 @@ export interface Section {
   summary?: string;
   readerQuestion?: string;
   cognitiveRole?: string;
+  bridgeFromPrev?: string;
+  hookToNext?: string;
 }
 
 export interface Outline {

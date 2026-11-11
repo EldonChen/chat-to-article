@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Check, Eye, HelpCircle, Image, Minus, Plus, Send, S
 import { useState } from "react";
 import type { FigureDraftWire, OutlineContext, ReviewOutlineInput, ReviewOutlineResult, SessionDetail } from "../../../src/shared/actions.ts";
 import { ActionBar } from "../components/ActionBar.tsx";
+import { ExpressChrome, toggleChip, withChips } from "../components/ExpressChrome.tsx";
 import { AutoTextarea, Badge, buttonClass, Card, FieldComment, inputClass, Tag } from "../components/ui.tsx";
 import { useDraft } from "../store.ts";
 import { VISUAL_STYLE_PRESETS } from "./PlanView.tsx";
@@ -83,6 +84,8 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
     };
   });
   const [editingFigId, setEditingFigId] = useState<string | null>(null);
+  const [express, setExpress] = useState(true);
+  const [chips, setChips] = useState<string[]>([]);
 
   const sections = draft.sections;
   const figures = draft.figures ?? [];
@@ -165,13 +168,22 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
       sections,
       figures,
       comments,
-      note: draft.note.trim() || undefined,
+      note: withChips(draft.note, chips),
     };
     submit(id, result);
   };
 
   return (
     <>
+      <ExpressChrome
+        express={express}
+        onExpress={setExpress}
+        thread={context.motivation?.ahaMoment || sections.map((s) => s.title).join(" → ")}
+        hook={context.motivation?.initialConfusion || sections[0]?.readerQuestion || ""}
+        structure={sections.map((s, i) => `${i + 1}. ${s.title}`).join("  ")}
+        chips={chips}
+        onChip={(id) => setChips((list) => toggleChip(list, id))}
+      />
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-4 @4xl:grid-cols-[minmax(0,1fr)_21rem]">
         <ol className="space-y-3">
           {sections.map((s, i) => {
@@ -197,6 +209,7 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                 </div>
 
                 <div className="mt-3 space-y-2.5 pl-8">
+                  {!express && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs text-stone-500">认知角色：</span>
                     {COGNITIVE_ROLE_PRESETS.map((preset) => (
@@ -221,7 +234,30 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                       className="w-36 rounded-md border border-dashed border-stone-300 bg-transparent px-2 py-0.5 text-xs outline-none dark:border-stone-700"
                     />
                   </div>
+                  )}
 
+                  <div className="space-y-2">
+                    <AutoTextarea
+                      value={s.readerQuestion ?? ""}
+                      onChange={(readerQuestion) => update(s.id, { readerQuestion })}
+                      placeholder="这一节回应读者心里的什么疑问？"
+                      minRows={3}
+                    />
+                    <AutoTextarea
+                      value={s.bridgeFromPrev ?? ""}
+                      onChange={(bridgeFromPrev) => update(s.id, { bridgeFromPrev })}
+                      placeholder="接住上一节的哪个状态或未解问题？"
+                      minRows={2}
+                    />
+                    <AutoTextarea
+                      value={s.hookToNext ?? ""}
+                      onChange={(hookToNext) => update(s.id, { hookToNext })}
+                      placeholder="本节最后交出去什么，下一节第一句必须先接住？"
+                      minRows={2}
+                    />
+                  </div>
+
+                  {!express && (
                   <div className="flex items-center gap-2 rounded-lg border border-stone-200/80 bg-stone-50/60 px-2.5 py-1.5 dark:border-stone-800 dark:bg-stone-800/40">
                     <HelpCircle className="size-3.5 shrink-0 text-amber-600" />
                     <input
@@ -231,15 +267,17 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                       className="w-full bg-transparent text-xs text-stone-700 outline-none dark:text-stone-200"
                     />
                   </div>
+                  )}
 
                   <AutoTextarea
                     value={s.summary ?? ""}
                     onChange={(summary) => update(s.id, { summary })}
                     placeholder="这一节打算怎么展开（可选）"
-                    minRows={1}
-                    className="text-xs text-stone-600 dark:text-stone-300"
+                    minRows={3}
                   />
 
+                  {!express && (
+                  <>
                   <div>
                     <div className="mb-1.5 text-xs text-stone-500">本节支撑主张（点选分配，直接显示主张摘要与认知角色）：</div>
                     <div className="space-y-1.5">
@@ -260,7 +298,7 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                           >
                             <span className="mt-0.5 font-mono text-[11px] font-semibold">{c.id}</span>
                             {roleInfo && <Badge tone={roleInfo.tone}>{roleInfo.label}</Badge>}
-                            <span className="line-clamp-1 flex-1">{c.text}</span>
+                            <span className="flex-1">{c.text}</span>
                           </button>
                         );
                       })}
@@ -494,6 +532,8 @@ export function OutlineView({ session, submit }: { session: SessionDetail<Review
                       </div>
                     )}
                   </div>
+                  </>
+                  )}
 
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <span className="mr-1 text-xs text-stone-500">正文块</span>

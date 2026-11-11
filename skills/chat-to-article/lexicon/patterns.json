@@ -5,13 +5,13 @@
   "patterns": [
     {
       "id": "pat-bushi",
-      "name": "不是A而是B",
+      "name": "不是A而是B（保持观察，不升为禁用，避免误杀路标式对照）",
       "regex": "不是[^。！？\\n]{1,40}而是",
       "severity": "watch"
     },
     {
       "id": "pat-bujin",
-      "name": "不仅A更B",
+      "name": "不仅A更B（保持观察，不升为禁用）",
       "regex": "不仅[^。！？\\n]{1,40}更",
       "severity": "watch"
     },
@@ -26,6 +26,24 @@
       "name": "It's not X. It's Y.",
       "regex": "It's not [^\\n.]{1,80}\\. It's ",
       "severity": "watch"
+    },
+    {
+      "id": "pat-ornament-simile",
+      "name": "装饰性明喻起手（机制算完之前改写成直接叙述）",
+      "regex": "仿佛|犹如",
+      "severity": "watch"
+    },
+    {
+      "id": "pat-fourth-wall",
+      "name": "第四面墙：正文点名聊天或摘录",
+      "regex": "聊天里|对话中|摘录里|摘录没有|聊天写到|聊天没有|聊天后文",
+      "severity": "ban"
+    },
+    {
+      "id": "pat-missing-value",
+      "name": "免责声明式缺失数值",
+      "regex": "没有在同一次计算|未约束概率没有给出|没有给出|同一次计算|确定得了[^。！？\\n]{0,80}确定不了",
+      "severity": "ban"
     }
   ]
 }

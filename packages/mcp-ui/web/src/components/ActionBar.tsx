@@ -26,7 +26,7 @@ export function ActionBar({ note, onNote, actions, onAction, status }: {
     <div className="sticky bottom-0 z-20 mt-auto border-t border-stone-200 bg-white/95 backdrop-blur dark:border-stone-800 dark:bg-stone-900/95">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 @4xl:flex-row @4xl:items-end">
         <div className="min-w-0 flex-1">
-          <AutoTextarea value={note} onChange={onNote} placeholder="整体意见（可选）：会和你的修改一起交给 agent" minRows={1} />
+          <AutoTextarea value={note} onChange={onNote} placeholder="整体意见（可选）。也可以直接点上面的诊断芯片。" minRows={2} />
           {(status || error) && (
             <div className={clsx("mt-1.5 text-xs", error ? "text-rose-600" : "text-stone-500")}>{error ?? status}</div>
           )}
