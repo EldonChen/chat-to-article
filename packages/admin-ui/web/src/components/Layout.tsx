@@ -4,6 +4,7 @@ import {
   Download,
   FolderOpen,
   LayoutDashboard,
+  LineChart,
   Lock,
   Monitor,
   Moon,
@@ -14,7 +15,7 @@ import {
   Sun,
 } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import { useArticles, useContext, useVoice } from "../api.ts";
 import { useUi, type Theme } from "../store.ts";
@@ -32,7 +33,7 @@ function useApplyTheme() {
   }, [theme]);
 }
 
-function NavItem({ to, icon, label, count, end }: { to: string; icon: ReactNode; label: string; count?: number; end?: boolean }) {
+function NavItem({ to, icon, label, count, end, accent }: { to: string; icon: ReactNode; label: string; count?: number; end?: boolean; accent?: boolean }) {
   return (
     <NavLink
       to={to}
@@ -41,8 +42,12 @@ function NavItem({ to, icon, label, count, end }: { to: string; icon: ReactNode;
         clsx(
           "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition",
           isActive
-            ? "bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
-            : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100",
+            ? accent
+              ? "bg-rose-50 font-medium text-rose-700 dark:bg-rose-950/60 dark:text-rose-200"
+              : "bg-indigo-50 font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+            : accent
+              ? "font-medium text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+              : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100",
         )
       }
     >
@@ -91,7 +96,7 @@ function TopBar() {
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
-            if (!location.pathname.startsWith("/articles")) navigate("/articles");
+            if (!location.pathname.startsWith("/articles") && !location.pathname.startsWith("/rsi")) navigate("/articles");
           }}
           placeholder="搜索文章标题、slug、主题或路径"
           className="w-full rounded-lg border border-stone-200 bg-white py-1.5 pl-9 pr-3 text-sm outline-none ring-indigo-500/30 placeholder:text-stone-400 focus:border-indigo-400 focus:ring-4 dark:border-stone-700 dark:bg-stone-900"
@@ -99,7 +104,7 @@ function TopBar() {
       </label>
       <div className="ml-auto flex items-center gap-2">
         <span className="hidden items-center gap-1 rounded-full bg-stone-200/70 px-2 py-0.5 text-xs text-stone-600 sm:inline-flex dark:bg-stone-800 dark:text-stone-300">
-          <Lock className="size-3" /> 只读
+          <Lock className="size-3" /> {location.pathname.startsWith("/rsi") ? "文章只读 · 评分可写" : "只读"}
         </span>
         <button
           onClick={toggleAutoRefresh}
@@ -143,6 +148,13 @@ export function Layout() {
   const ctx = useContext();
   const articles = useArticles();
   const voice = useVoice();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const wide = location.pathname.startsWith("/rsi");
+  useEffect(() => {
+    if (params.get("tab") === "rsi" && location.pathname !== "/rsi") navigate("/rsi", { replace: true });
+  }, [params, location.pathname, navigate]);
   return (
     <div className="flex h-full">
       <aside className="flex w-60 shrink-0 flex-col border-r border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900">
@@ -154,6 +166,7 @@ export function Layout() {
           </div>
         </div>
         <nav className="space-y-0.5 px-3">
+          <NavItem to="/rsi" icon={<LineChart />} label="RSI 演进看板" accent />
           <NavItem to="/" end icon={<LayoutDashboard />} label="概览" />
           <NavItem to="/articles" icon={<BookOpenText />} label="文章" count={articles.data?.length} />
           <div className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-wide text-stone-400">声音目录</div>
@@ -171,11 +184,17 @@ export function Layout() {
           <PathRow label="skill" value={ctx.data?.skillDir} missing="未找到（共享词表不可用）" />
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-y-auto">
+      <main className={clsx("min-w-0 flex-1", wide ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
         <TopBar />
-        <div className="mx-auto max-w-6xl px-6 py-6">
-          <Outlet />
-        </div>
+        {wide ? (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <Outlet />
+          </div>
+        ) : (
+          <div className="mx-auto max-w-6xl px-6 py-6">
+            <Outlet />
+          </div>
+        )}
       </main>
     </div>
   );
